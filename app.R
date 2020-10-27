@@ -101,7 +101,11 @@ ui <- fluidPage(
                          h4("A few tabs are included that show historical attempts in powerlifting meets for your target max weight. The y-axis shows the percentage of people that had a successful third lift at specific weights for attempt 1 or 2. You can think of this as supplemental information to see the most common attempts historically or to help you strategize your starting weights or second attempt weights. These graphs are iteratively generated, so some may not be that pretty. In the future, I plan to further add graphs to help choose an opener and see the highest success rates per lift."),
                          br(),
                          br(),
-                         h4("The last piece of information currently present in this calculator is an homage to some of the greatest lifters of all time. I've taken a list of the top 1% of lifters among different weights, sexes, and equipment categories. When you enter your body weight on the main page, a small blurb will appear about one of these lifters with a similar weight to you. I have also included if their meet was drug-tested or not; surprisingly, 71% of these performances were at drug-tested meets.")
+                         h4("The last piece of information currently present in this calculator is an homage to some of the greatest lifters of all time. I've taken a list of the top 1% of lifters among different weights, sexes, and equipment categories. When you enter your body weight on the main page, a small blurb will appear about one of these lifters with a similar weight to you. I have also included if their meet was drug-tested or not; surprisingly, 71% of these performances were at drug-tested meets."),
+                         br(),
+                         br(),
+                         h5("This page uses data from the OpenPowerlifting project, https://www.openpowerlifting.org.
+                            You may download a copy of the data at https://gitlab.com/openpowerlifting/opl-data.")
                          
                          ),
                 tabPanel("Squat graph",
