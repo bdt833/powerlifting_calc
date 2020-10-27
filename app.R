@@ -14,8 +14,9 @@ library(ggplot2)
 library(ggpubr)
 library(plotly)
 library(scales)
-load("PL_Web.RData")
+load("PL_Web.RData") #data 
 
+# functions to find the nearest weight value, in kg, of listed weight attempts compared to input
 test_squat <- function(x) {
     squat_sampsize$diff <- squat_sampsize$Squat3Kg - x
     y <- which.min(abs(squat_sampsize$diff))
@@ -34,12 +35,10 @@ test_deadlift <- function(x) {
     return(deadlift_sampsize$Deadlift3Kg[y])
 }
 
-# Define UI for application that draws a histogram
 ui <- fluidPage(
-    # Application title
     titlePanel("Powerlifting Lift Attempt Calculator"),
 
-    # Sidebar with a slider input for number of bins 
+    # sidebar with inputs for age, sex, equipment, weight, lift weights, display/enter in lbs/kg 
     sidebarLayout(
         sidebarPanel(
             fluidRow(
@@ -78,11 +77,12 @@ ui <- fluidPage(
                          value = 185)
         ),
 
-        # Show a plot of the generated distribution
+        
         mainPanel(
+            # tabs for predictive model output, about, squat/bench/deadlift graphs
             tabsetPanel(
                 tabPanel("Prediction", 
-                         uiOutput("model_predictions"),
+                         uiOutput("squat_predictions"),
                          hr(),
                          uiOutput("bench_predictions"),
                          hr(),
@@ -137,9 +137,10 @@ ui <- fluidPage(
     )
 )
 
-# Define server logic required to draw a histogram
 server <- function(input, output) {
-    output$model_predictions <- renderUI({
+    # generate file for outputting squat lift predictions
+    output$squat_predictions <- renderUI({
+        # input validation
         if(is.na(input$age)) {
             HTML(paste0(h3("Missing age! Please enter age.")))
         } else if (is.na(input$weight)) {
@@ -162,24 +163,29 @@ server <- function(input, output) {
             HTML(paste0(h3("Please enter a non-negative deadlift weight.")))
         }
         else {
+            #create a dataframe called user_info with all the users' input
         user_info <- setNames(data.frame(input$age, factor(input$sex), ifelse(input$lbskg == 1, input$weight, input$weight*0.453592), 
                                          factor(input$equipment), ifelse(input$lbskg == 1, input$squat, input$squat*0.453592), 
                                          ifelse(input$lbskg == 1, input$bench, input$bench*0.453592), 
                                          ifelse(input$lbskg == 1, input$deadlift, input$deadlift*0.453592)),
                               c("Age", "Sex", "BodyweightKg", "Equipment", "Squat3Kg", "Bench3Kg", "Deadlift3Kg"))
+        #variables for squat predictions, lift 1 and 2, in kg
         squat_1kg_pred <- round(predict(Squat1Kg_model, user_info)*2)/2
         squat_2kg_pred <- round(predict(Squat2Kg_model, user_info)*2)/2
         if (input$lbskg2 == 0){
+            #in lbs
             squat_1lb_pred <- round(squat_1kg_pred/0.453592)
             squat_2lb_pred <- round(squat_2kg_pred/0.453592)
+            #paste result, lbs
             HTML(paste0(h3("Your Squat lift attempts are:"), br(), h4("Lift 1: ", squat_1lb_pred, "lbs"), br(), h4("Lift 2: ", squat_2lb_pred, "lbs")))
         } else {
+            #paste result, kg
         HTML(paste0(h3("Your Squat lift attempts are:"), br(), h4("Lift 1: ", squat_1kg_pred, "kg"), br(), h4("Lift 2: ", squat_2kg_pred, "kg"))
         )
         }
         }
     })
-    
+    # repeat above; only have squat 1 prediction included
     output$squatone <- renderUI({
         if(is.na(input$age)) {
             paste0("")
@@ -217,6 +223,7 @@ server <- function(input, output) {
         }
     })
     
+    #repeat above, only squat 2 prediction
     output$squattwo <- renderUI({
         if(is.na(input$age)) {
             paste0("")
@@ -254,6 +261,7 @@ server <- function(input, output) {
         }
     })
     
+    #bench 1 prediction
     output$benchone <- renderUI({
         if(is.na(input$age)) {
             paste0("")
@@ -291,6 +299,7 @@ server <- function(input, output) {
         }
     })
     
+    #bench 2 prediction
     output$benchtwo <- renderUI({
         if(is.na(input$age)) {
             paste0("")
@@ -328,6 +337,7 @@ server <- function(input, output) {
         }
     })
     
+    #deadlift 1 prediction
     output$deadliftone <- renderUI({
         if(is.na(input$age)) {
             paste0("")
@@ -365,6 +375,7 @@ server <- function(input, output) {
         }
     })
     
+    #deadlift 2 prediction
     output$deadlifttwo <- renderUI({
         if(is.na(input$age)) {
             paste0("")
@@ -402,6 +413,7 @@ server <- function(input, output) {
         }
     })
     
+    #list of bench predictions for page 1
     output$bench_predictions <- renderUI({
         if(is.na(input$age)) {
             paste0("")
@@ -441,6 +453,7 @@ server <- function(input, output) {
         }
     })
     
+    #list of deadlift predictions for page 1
     output$deadlift_predictions <- renderUI({
         if(is.na(input$age)) {
             paste0("")
@@ -480,260 +493,281 @@ server <- function(input, output) {
         }
     })
     
+    #rendering an interactive plot
     output$squat1Plot <- renderPlotly({
+        #input validation
         if (is.na(input$squat)|input$squat<0) {} else {
-            if (input$lbskg == 0 & input$lbskg2 == 0) {
-                squat_val <- test_squat(input$squat*0.453592)
+            #test for units for input and viewing
+            if (input$lbskg == 0 & input$lbskg2 == 0) { 
+                #use function to find nearest squat value
+                squat_val <- test_squat(input$squat*0.453592) #multiply due to input in lbs
+                #filter for squats that are of the same squat value, equipment, sex; group and find ratio of success compared to squat 3 (exclude 100% success)
                 squat_one <- pl_web_clean %>% filter(Squat3Kg == squat_val, Equipment == input$equipment, Sex == input$sex) %>% group_by(Squat1Kg) %>% 
                     summarise(ratio = sum(Squat3SF/n()), Sample_Size = n()) %>% filter(ratio != 1) %>% mutate(Squat1Lb = Squat1Kg/0.453592)
-                g <- ggplot(squat_one, aes(Squat1Lb, ratio, fill = Sample_Size)) + geom_col(aes(text = paste0(round(ratio*100), "% success on lift 3"))) + scale_fill_viridis_c() + 
-                    xlim(round(squat_val*0.8/0.453592),squat_val/0.453592-1) + theme_pubr(legend="right") + ylab("Ratio of success on Squat 3") + xlab("Squat 1 Weight (in lbs)") + 
-                    labs(fill = "# of lifts") + scale_y_continuous(labels = percent)
-                ggplotly(g, tooltip = c("Sample_Size", "text", "Squat1Lb"))
-            } else if (input$lbskg == 0 & input$lbskg2 == 1) {
+                #create column plot showing weight vs ratio of success on lift 3, includes sample size per weight
+                g <- ggplot(squat_one, aes(Squat1Lb, ratio, fill = Sample_Size)) + geom_col(aes(text = paste0(round(ratio*100), "% success on lift 3"))) + 
+                    scale_fill_viridis_c() + xlim(round(squat_val*0.8/0.453592),squat_val/0.453592-1) + theme_pubr(legend="right") + 
+                    ylab("Ratio of success on Squat 3") + xlab("Squat 1 Weight (in lbs)") + labs(fill = "# of lifts") + scale_y_continuous(labels = percent)
+                ggplotly(g, tooltip = c("Sample_Size", "text", "Squat1Lb")) #convert it to plotly for interactivity
+            } else if (input$lbskg == 0 & input$lbskg2 == 1) { 
+                #test units for input, viewing; same as above but with different units
                 squat_val <- test_squat(input$squat*0.453592)
                 squat_one <- pl_web_clean %>% filter(Squat3Kg == squat_val, Equipment == input$equipment, Sex == input$sex) %>% group_by(Squat1Kg) %>% 
                     summarise(ratio = sum(Squat3SF/n()), Sample_Size = n()) %>% filter(ratio != 1) 
-                g <- ggplot(squat_one, aes(Squat1Kg, ratio, fill = Sample_Size)) + geom_col(aes(text = paste0(round(ratio*100), "% success on lift 3"))) + scale_fill_viridis_c() + 
-                    xlim(round(squat_val*0.8),squat_val-1) + theme_pubr(legend="right") + ylab("Ratio of success on Squat 3") + xlab("Squat 1 Weight (in kg)") + 
-                    labs(fill = "# of lifts") + scale_y_continuous(labels = percent)
+                g <- ggplot(squat_one, aes(Squat1Kg, ratio, fill = Sample_Size)) + geom_col(aes(text = paste0(round(ratio*100), "% success on lift 3"))) +
+                    scale_fill_viridis_c() + xlim(round(squat_val*0.8),squat_val-1) + theme_pubr(legend="right") + ylab("Ratio of success on Squat 3") + 
+                    xlab("Squat 1 Weight (in kg)") + labs(fill = "# of lifts") + scale_y_continuous(labels = percent)
                 ggplotly(g, tooltip = c("Sample_Size", "text", "Squat1Kg"))
-            } else if (input$lbskg == 1 & input$lbskg2 == 0) {
+            } else if (input$lbskg == 1 & input$lbskg2 == 0) { #same as above
                 squat_val <- test_squat(input$squat)
                 squat_one <- pl_web_clean %>% filter(Squat3Kg == squat_val, Equipment == input$equipment, Sex == input$sex) %>% group_by(Squat1Kg) %>% 
                     summarise(ratio = sum(Squat3SF/n()), Sample_Size = n()) %>% filter(ratio != 1) %>% mutate(Squat1Lb = Squat1Kg/0.453592)
-                g <- ggplot(squat_one, aes(Squat1Lb, ratio, fill = Sample_Size)) + geom_col(aes(text = paste0(round(ratio*100), "% success on lift 3"))) + scale_fill_viridis_c() + 
-                    xlim(round(squat_val*0.8/0.453592),squat_val/0.453592-1) + theme_pubr(legend="right") + ylab("Ratio of success on Squat 3") + xlab("Squat 1 Weight (in lbs)") + 
-                    labs(fill = "# of lifts") + scale_y_continuous(labels = percent)
+                g <- ggplot(squat_one, aes(Squat1Lb, ratio, fill = Sample_Size)) + geom_col(aes(text = paste0(round(ratio*100), "% success on lift 3"))) + 
+                    scale_fill_viridis_c() + xlim(round(squat_val*0.8/0.453592),squat_val/0.453592-1) + theme_pubr(legend="right") + 
+                    ylab("Ratio of success on Squat 3") + xlab("Squat 1 Weight (in lbs)") + labs(fill = "# of lifts") + scale_y_continuous(labels = percent)
                 ggplotly(g, tooltip = c("Sample_Size", "text", "Squat1Lb"))
-            } else if (input$lbskg == 1 & input$lbskg2 == 1) {
+            } else if (input$lbskg == 1 & input$lbskg2 == 1) { #same as above
                 squat_val <- test_squat(input$squat)
                 squat_one <- pl_web_clean %>% filter(Squat3Kg == squat_val, Equipment == input$equipment, Sex == input$sex) %>% group_by(Squat1Kg) %>% 
                     summarise(ratio = sum(Squat3SF/n()), Sample_Size = n()) %>% filter(ratio != 1) 
-                g <- ggplot(squat_one, aes(Squat1Kg, ratio, fill = Sample_Size)) + geom_col(aes(text = paste0(round(ratio*100), "% success on lift 3"))) + scale_fill_viridis_c() + 
-                    xlim(round(squat_val*0.8),squat_val-1) + theme_pubr(legend="right") + ylab("Ratio of success on Squat 3") + xlab("Squat 1 Weight (in kg)") + 
-                    labs(fill = "# of lifts") + scale_y_continuous(labels = percent)
+                g <- ggplot(squat_one, aes(Squat1Kg, ratio, fill = Sample_Size)) + geom_col(aes(text = paste0(round(ratio*100), "% success on lift 3"))) + 
+                    scale_fill_viridis_c() + xlim(round(squat_val*0.8),squat_val-1) + theme_pubr(legend="right") + ylab("Ratio of success on Squat 3") + 
+                    xlab("Squat 1 Weight (in kg)") + labs(fill = "# of lifts") + scale_y_continuous(labels = percent)
                 ggplotly(g, tooltip = c("Sample_Size", "text", "Squat1Kg"))
             }
         }
         })
+    
+    #same as squat1Plot
     output$squat2Plot <- renderPlotly({
-        # create a squat histogram based off info from ui.R
         if (is.na(input$squat)|input$squat<0) {} else {
             if (input$lbskg == 0 & input$lbskg2 == 0) {
                 squat_val <- test_squat(input$squat*0.453592)
                 squat_two <- pl_web_clean %>% filter(Squat3Kg == squat_val, Equipment == input$equipment, Sex == input$sex) %>% group_by(Squat2Kg) %>% 
                     summarise(ratio = sum(Squat3SF/n()), Sample_Size = n()) %>% filter(ratio != 1) %>% mutate(Squat2Lb = Squat2Kg/0.453592)
-                g <- ggplot(squat_two, aes(Squat2Lb, ratio, fill = Sample_Size)) + geom_col(aes(text = paste0(round(ratio*100), "% success on lift 3"))) + scale_fill_viridis_c() + 
-                    xlim(round(squat_val*0.8/0.453592),squat_val/0.453592-1) + theme_pubr(legend="right") + ylab("Ratio of success on Squat 3") + xlab("Squat 2 Weight (in lbs)") + 
-                    labs(fill = "# of lifts") + scale_y_continuous(labels = percent)
+                g <- ggplot(squat_two, aes(Squat2Lb, ratio, fill = Sample_Size)) + geom_col(aes(text = paste0(round(ratio*100), "% success on lift 3"))) + 
+                    scale_fill_viridis_c() + xlim(round(squat_val*0.8/0.453592),squat_val/0.453592-1) + theme_pubr(legend="right") + 
+                    ylab("Ratio of success on Squat 3") + xlab("Squat 2 Weight (in lbs)") + labs(fill = "# of lifts") + scale_y_continuous(labels = percent)
                 ggplotly(g, tooltip = c("Sample_Size", "text", "Squat2Lb"))
             } else if (input$lbskg == 0 & input$lbskg2 == 1) {
                 squat_val <- test_squat(input$squat*0.453592)
                 squat_two <- pl_web_clean %>% filter(Squat3Kg == squat_val, Equipment == input$equipment, Sex == input$sex) %>% group_by(Squat2Kg) %>% 
                     summarise(ratio = sum(Squat3SF/n()), Sample_Size = n()) %>% filter(ratio != 1) 
-                g <- ggplot(squat_two, aes(Squat2Kg, ratio, fill = Sample_Size)) + geom_col(aes(text = paste0(round(ratio*100), "% success on lift 3"))) + scale_fill_viridis_c() + 
-                    xlim(round(squat_val*0.8),squat_val-1) + theme_pubr(legend="right") + ylab("Ratio of success on Squat 3") + xlab("Squat 2 Weight (in kg)") + 
-                    labs(fill = "# of lifts") + scale_y_continuous(labels = percent)
+                g <- ggplot(squat_two, aes(Squat2Kg, ratio, fill = Sample_Size)) + geom_col(aes(text = paste0(round(ratio*100), "% success on lift 3"))) + 
+                    scale_fill_viridis_c() + xlim(round(squat_val*0.8),squat_val-1) + theme_pubr(legend="right") + ylab("Ratio of success on Squat 3") + 
+                    xlab("Squat 2 Weight (in kg)") + labs(fill = "# of lifts") + scale_y_continuous(labels = percent)
                 ggplotly(g, tooltip = c("Sample_Size", "text", "Squat2Kg"))
             } else if (input$lbskg == 1 & input$lbskg2 == 0) {
                 squat_val <- test_squat(input$squat)
                 squat_two <- pl_web_clean %>% filter(Squat3Kg == squat_val, Equipment == input$equipment, Sex == input$sex) %>% group_by(Squat2Kg) %>% 
                     summarise(ratio = sum(Squat3SF/n()), Sample_Size = n()) %>% filter(ratio != 1) %>% mutate(Squat2Lb = Squat2Kg/0.453592)
-                g <- ggplot(squat_two, aes(Squat2Lb, ratio, fill = Sample_Size)) + geom_col(aes(text = paste0(round(ratio*100), "% success on lift 3"))) + scale_fill_viridis_c() + 
-                    xlim(round(squat_val*0.8/0.453592),squat_val/0.453592-1) + theme_pubr(legend="right") + ylab("Ratio of success on Squat 3") + xlab("Squat 2 Weight (in lbs)") + 
-                    labs(fill = "# of lifts") + scale_y_continuous(labels = percent)
+                g <- ggplot(squat_two, aes(Squat2Lb, ratio, fill = Sample_Size)) + geom_col(aes(text = paste0(round(ratio*100), "% success on lift 3"))) + 
+                    scale_fill_viridis_c() + xlim(round(squat_val*0.8/0.453592),squat_val/0.453592-1) + theme_pubr(legend="right") + 
+                    ylab("Ratio of success on Squat 3") + xlab("Squat 2 Weight (in lbs)") + labs(fill = "# of lifts") + scale_y_continuous(labels = percent)
                 ggplotly(g, tooltip = c("Sample_Size", "text", "Squat2Lb"))
             } else if (input$lbskg == 1 & input$lbskg2 == 1) {
                 squat_val <- test_squat(input$squat)
                 squat_two <- pl_web_clean %>% filter(Squat3Kg == squat_val, Equipment == input$equipment, Sex == input$sex) %>% group_by(Squat2Kg) %>% 
                     summarise(ratio = sum(Squat3SF/n()), Sample_Size = n()) %>% filter(ratio != 1) 
-                g <- ggplot(squat_two, aes(Squat2Kg, ratio, fill = Sample_Size)) + geom_col(aes(text = paste0(round(ratio*100), "% success on lift 3"))) + scale_fill_viridis_c() + 
-                    xlim(round(squat_val*0.8),squat_val-1) + theme_pubr(legend="right") + ylab("Ratio of success on Squat 3") + xlab("Squat 2 Weight (in kg)") + 
-                    labs(fill = "# of lifts") + scale_y_continuous(labels = percent)
+                g <- ggplot(squat_two, aes(Squat2Kg, ratio, fill = Sample_Size)) + geom_col(aes(text = paste0(round(ratio*100), "% success on lift 3"))) + 
+                    scale_fill_viridis_c() + xlim(round(squat_val*0.8),squat_val-1) + theme_pubr(legend="right") + ylab("Ratio of success on Squat 3") + 
+                    xlab("Squat 2 Weight (in kg)") + labs(fill = "# of lifts") + scale_y_continuous(labels = percent)
                 ggplotly(g, tooltip = c("Sample_Size", "text", "Squat2Kg"))
             }
         }
     })
     
+    #same as above
     output$bench1Plot <- renderPlotly({
-        # create a Bench histogram based off info from ui.R
         if (is.na(input$bench)|input$bench<0) {} else {
             if (input$lbskg == 0 & input$lbskg2 == 0) {
                 bench_val <- test_bench(input$bench*0.453592)
                 bench_one <- pl_web_clean %>% filter(Bench3Kg == bench_val, Equipment == input$equipment, Sex == input$sex) %>% group_by(Bench1Kg) %>% 
                     summarise(ratio = sum(Bench3SF/n()), Sample_Size = n()) %>% filter(ratio != 1) %>% mutate(Bench1Lb = Bench1Kg/0.453592)
-                g <- ggplot(bench_one, aes(Bench1Lb, ratio, fill = Sample_Size)) + geom_col(aes(text = paste0(round(ratio*100), "% success on lift 3"))) + scale_fill_viridis_c() + 
-                    xlim(round(bench_val*0.8/0.453592),bench_val/0.453592-1) + theme_pubr(legend="right") + ylab("Ratio of success on Bench 3") + xlab("Bench 1 Weight (in lbs)") + 
-                    labs(fill = "# of lifts") + scale_y_continuous(labels = percent)
+                g <- ggplot(bench_one, aes(Bench1Lb, ratio, fill = Sample_Size)) + geom_col(aes(text = paste0(round(ratio*100), "% success on lift 3"))) + 
+                    scale_fill_viridis_c() + xlim(round(bench_val*0.8/0.453592),bench_val/0.453592-1) + theme_pubr(legend="right") + 
+                    ylab("Ratio of success on Bench 3") + xlab("Bench 1 Weight (in lbs)") + labs(fill = "# of lifts") + scale_y_continuous(labels = percent)
                 ggplotly(g, tooltip = c("Sample_Size", "text", "Bench1Lb"))
             } else if (input$lbskg == 0 & input$lbskg2 == 1) {
                 bench_val <- test_bench(input$bench*0.453592)
                 bench_one <- pl_web_clean %>% filter(Bench3Kg == bench_val, Equipment == input$equipment, Sex == input$sex) %>% group_by(Bench1Kg) %>% 
                     summarise(ratio = sum(Bench3SF/n()), Sample_Size = n()) %>% filter(ratio != 1) 
-                g <- ggplot(bench_one, aes(Bench1Kg, ratio, fill = Sample_Size)) + geom_col(aes(text = paste0(round(ratio*100), "% success on lift 3"))) + scale_fill_viridis_c() + 
-                    xlim(round(bench_val*0.8),bench_val-1) + theme_pubr(legend="right") + ylab("Ratio of success on Bench 3") + xlab("Bench 1 Weight (in kg)") + 
-                    labs(fill = "# of lifts") + scale_y_continuous(labels = percent)
+                g <- ggplot(bench_one, aes(Bench1Kg, ratio, fill = Sample_Size)) + geom_col(aes(text = paste0(round(ratio*100), "% success on lift 3"))) + 
+                    scale_fill_viridis_c() + xlim(round(bench_val*0.8),bench_val-1) + theme_pubr(legend="right") + ylab("Ratio of success on Bench 3") + 
+                    xlab("Bench 1 Weight (in kg)") + labs(fill = "# of lifts") + scale_y_continuous(labels = percent)
                 ggplotly(g, tooltip = c("Sample_Size", "text", "Bench1Kg"))
             } else if (input$lbskg == 1 & input$lbskg2 == 0) {
                 bench_val <- test_bench(input$bench)
                 bench_one <- pl_web_clean %>% filter(Bench3Kg == bench_val, Equipment == input$equipment, Sex == input$sex) %>% group_by(Bench1Kg) %>% 
                     summarise(ratio = sum(Bench3SF/n()), Sample_Size = n()) %>% filter(ratio != 1) %>% mutate(Bench1Lb = Bench1Kg/0.453592)
-                g <- ggplot(bench_one, aes(Bench1Lb, ratio, fill = Sample_Size)) + geom_col(aes(text = paste0(round(ratio*100), "% success on lift 3"))) + scale_fill_viridis_c() + 
-                    xlim(round(bench_val*0.8/0.453592),bench_val/0.453592-1) + theme_pubr(legend="right") + ylab("Ratio of success on Bench 3") + xlab("Bench 1 Weight (in lbs)") + 
-                    labs(fill = "# of lifts") + scale_y_continuous(labels = percent)
+                g <- ggplot(bench_one, aes(Bench1Lb, ratio, fill = Sample_Size)) + geom_col(aes(text = paste0(round(ratio*100), "% success on lift 3"))) + 
+                    scale_fill_viridis_c() + xlim(round(bench_val*0.8/0.453592),bench_val/0.453592-1) + theme_pubr(legend="right") + 
+                    ylab("Ratio of success on Bench 3") + xlab("Bench 1 Weight (in lbs)") + labs(fill = "# of lifts") + scale_y_continuous(labels = percent)
                 ggplotly(g, tooltip = c("Sample_Size", "text", "Bench1Lb"))
             } else if (input$lbskg == 1 & input$lbskg2 == 1) {
                 bench_val <- test_bench(input$bench)
                 bench_one <- pl_web_clean %>% filter(Bench3Kg == bench_val, Equipment == input$equipment, Sex == input$sex) %>% group_by(Bench1Kg) %>% 
                     summarise(ratio = sum(Bench3SF/n()), Sample_Size = n()) %>% filter(ratio != 1) 
-                g <- ggplot(bench_one, aes(Bench1Kg, ratio, fill = Sample_Size)) + geom_col(aes(text = paste0(round(ratio*100), "% success on lift 3"))) + scale_fill_viridis_c() + 
-                    xlim(round(bench_val*0.8),bench_val-1) + theme_pubr(legend="right") + ylab("Ratio of success on Bench 3") + xlab("Bench 1 Weight (in kg)") + 
-                    labs(fill = "# of lifts") + scale_y_continuous(labels = percent)
+                g <- ggplot(bench_one, aes(Bench1Kg, ratio, fill = Sample_Size)) + geom_col(aes(text = paste0(round(ratio*100), "% success on lift 3"))) + 
+                    scale_fill_viridis_c() + xlim(round(bench_val*0.8),bench_val-1) + theme_pubr(legend="right") + ylab("Ratio of success on Bench 3") + 
+                    xlab("Bench 1 Weight (in kg)") + labs(fill = "# of lifts") + scale_y_continuous(labels = percent)
                 ggplotly(g, tooltip = c("Sample_Size", "text", "Bench1Kg"))
             }
         }
     })
     
+    #same as above
     output$bench2Plot <- renderPlotly({
-        # create a Bench histogram based off info from ui.R
         if (is.na(input$bench)|input$bench<0) {} else {
             if (input$lbskg == 0 & input$lbskg2 == 0) {
                 bench_val <- test_bench(input$bench*0.453592)
                 bench_two <- pl_web_clean %>% filter(Bench3Kg == bench_val, Equipment == input$equipment, Sex == input$sex) %>% group_by(Bench2Kg) %>% 
                     summarise(ratio = sum(Bench3SF/n()), Sample_Size = n()) %>% filter(ratio != 1) %>% mutate(Bench2Lb = Bench2Kg/0.453592)
-                g <- ggplot(bench_two, aes(Bench2Lb, ratio, fill = Sample_Size)) + geom_col(aes(text = paste0(round(ratio*100), "% success on lift 3"))) + scale_fill_viridis_c() + 
-                    xlim(round(bench_val*0.8/0.453592),bench_val/0.453592-1) + theme_pubr(legend="right") + ylab("Ratio of success on Bench 3") + xlab("Bench 2 Weight (in lbs)") + 
-                    labs(fill = "# of lifts") + scale_y_continuous(labels = percent)
+                g <- ggplot(bench_two, aes(Bench2Lb, ratio, fill = Sample_Size)) + geom_col(aes(text = paste0(round(ratio*100), "% success on lift 3"))) + 
+                    scale_fill_viridis_c() + xlim(round(bench_val*0.8/0.453592),bench_val/0.453592-1) + theme_pubr(legend="right") + 
+                    ylab("Ratio of success on Bench 3") + xlab("Bench 2 Weight (in lbs)") + labs(fill = "# of lifts") + scale_y_continuous(labels = percent)
                 ggplotly(g, tooltip = c("Sample_Size", "text", "Bench2Lb"))
             } else if (input$lbskg == 0 & input$lbskg2 == 1) {
                 bench_val <- test_bench(input$bench*0.453592)
                 bench_two <- pl_web_clean %>% filter(Bench3Kg == bench_val, Equipment == input$equipment, Sex == input$sex) %>% group_by(Bench2Kg) %>% 
                     summarise(ratio = sum(Bench3SF/n()), Sample_Size = n()) %>% filter(ratio != 1) 
-                g <- ggplot(bench_two, aes(Bench2Kg, ratio, fill = Sample_Size)) + geom_col(aes(text = paste0(round(ratio*100), "% success on lift 3"))) + scale_fill_viridis_c() + 
-                    xlim(round(bench_val*0.8),bench_val-1) + theme_pubr(legend="right") + ylab("Ratio of success on Bench 3") + xlab("Bench 2 Weight (in kg)") + 
-                    labs(fill = "# of lifts") + scale_y_continuous(labels = percent)
+                g <- ggplot(bench_two, aes(Bench2Kg, ratio, fill = Sample_Size)) + geom_col(aes(text = paste0(round(ratio*100), "% success on lift 3"))) + 
+                    scale_fill_viridis_c() + xlim(round(bench_val*0.8),bench_val-1) + theme_pubr(legend="right") + ylab("Ratio of success on Bench 3") + 
+                    xlab("Bench 2 Weight (in kg)") + labs(fill = "# of lifts") + scale_y_continuous(labels = percent)
                 ggplotly(g, tooltip = c("Sample_Size", "text", "Bench2Kg"))
             } else if (input$lbskg == 1 & input$lbskg2 == 0) {
                 bench_val <- test_bench(input$bench)
                 bench_two <- pl_web_clean %>% filter(Bench3Kg == bench_val, Equipment == input$equipment, Sex == input$sex) %>% group_by(Bench2Kg) %>% 
                     summarise(ratio = sum(Bench3SF/n()), Sample_Size = n()) %>% filter(ratio != 1) %>% mutate(Bench2Lb = Bench2Kg/0.453592)
-                g <- ggplot(bench_two, aes(Bench2Lb, ratio, fill = Sample_Size)) + geom_col(aes(text = paste0(round(ratio*100), "% success on lift 3"))) + scale_fill_viridis_c() + 
-                    xlim(round(bench_val*0.8/0.453592),bench_val/0.453592-1) + theme_pubr(legend="right") + ylab("Ratio of success on Bench 3") + xlab("Bench 2 Weight (in lbs)") + 
-                    labs(fill = "# of lifts") + scale_y_continuous(labels = percent)
+                g <- ggplot(bench_two, aes(Bench2Lb, ratio, fill = Sample_Size)) + geom_col(aes(text = paste0(round(ratio*100), "% success on lift 3"))) + 
+                    scale_fill_viridis_c() + xlim(round(bench_val*0.8/0.453592),bench_val/0.453592-1) + theme_pubr(legend="right") + 
+                    ylab("Ratio of success on Bench 3") + xlab("Bench 2 Weight (in lbs)") + labs(fill = "# of lifts") + scale_y_continuous(labels = percent)
                 ggplotly(g, tooltip = c("Sample_Size", "text", "Bench2Lb"))
             } else if (input$lbskg == 1 & input$lbskg2 == 1) {
                 bench_val <- test_bench(input$bench)
                 bench_two <- pl_web_clean %>% filter(Bench3Kg == bench_val, Equipment == input$equipment, Sex == input$sex) %>% group_by(Bench2Kg) %>% 
                     summarise(ratio = sum(Bench3SF/n()), Sample_Size = n()) %>% filter(ratio != 1) 
-                g <- ggplot(bench_two, aes(Bench2Kg, ratio, fill = Sample_Size)) + geom_col(aes(text = paste0(round(ratio*100), "% success on lift 3"))) + scale_fill_viridis_c() + 
-                    xlim(round(bench_val*0.8),bench_val-1) + theme_pubr(legend="right") + ylab("Ratio of success on Bench 3") + xlab("Bench 2 Weight (in kg)") + 
-                    labs(fill = "# of lifts") + scale_y_continuous(labels = percent)
+                g <- ggplot(bench_two, aes(Bench2Kg, ratio, fill = Sample_Size)) + geom_col(aes(text = paste0(round(ratio*100), "% success on lift 3"))) + 
+                    scale_fill_viridis_c() + xlim(round(bench_val*0.8),bench_val-1) + theme_pubr(legend="right") + ylab("Ratio of success on Bench 3") + 
+                    xlab("Bench 2 Weight (in kg)") + labs(fill = "# of lifts") + scale_y_continuous(labels = percent)
                 ggplotly(g, tooltip = c("Sample_Size", "text", "Bench2Kg"))
             }
         }
     })
+    
+    #same as above
     output$deadlift1Plot <- renderPlotly({
-        # create a Deadlift histogram based off info from ui.R
         if (is.na(input$deadlift)|input$deadlift<0) {} else {
             if (input$lbskg == 0 & input$lbskg2 == 0) {
                 deadlift_val <- test_deadlift(input$deadlift*0.453592)
-                deadlift_one <- pl_web_clean %>% filter(Deadlift3Kg == deadlift_val, Equipment == input$equipment, Sex == input$sex) %>% group_by(Deadlift1Kg) %>% 
-                    summarise(ratio = sum(Deadlift3SF/n()), Sample_Size = n()) %>% filter(ratio != 1) %>% mutate(Deadlift1Lb = Deadlift1Kg/0.453592)
-                g <- ggplot(deadlift_one, aes(Deadlift1Lb, ratio, fill = Sample_Size)) + geom_col(aes(text = paste0(round(ratio*100), "% success on lift 3"))) + scale_fill_viridis_c() + 
-                    xlim(round(deadlift_val*0.8/0.453592),deadlift_val/0.453592-1) + theme_pubr(legend="right") + ylab("Ratio of success on Deadlift 3") + xlab("Deadlift 1 Weight (in lbs)") + 
-                    labs(fill = "# of lifts") + scale_y_continuous(labels = percent)
+                deadlift_one <- pl_web_clean %>% filter(Deadlift3Kg == deadlift_val, Equipment == input$equipment, Sex == input$sex) %>% 
+                    group_by(Deadlift1Kg) %>% summarise(ratio = sum(Deadlift3SF/n()), Sample_Size = n()) %>% filter(ratio != 1) %>% 
+                    mutate(Deadlift1Lb = Deadlift1Kg/0.453592)
+                g <- ggplot(deadlift_one, aes(Deadlift1Lb, ratio, fill = Sample_Size)) + geom_col(aes(text = paste0(round(ratio*100), "% success on lift 3"))) + 
+                    scale_fill_viridis_c() + xlim(round(deadlift_val*0.8/0.453592),deadlift_val/0.453592-1) + theme_pubr(legend="right") + 
+                    ylab("Ratio of success on Deadlift 3") + xlab("Deadlift 1 Weight (in lbs)") + labs(fill = "# of lifts") + 
+                    scale_y_continuous(labels = percent)
                 ggplotly(g, tooltip = c("Sample_Size", "text", "Deadlift1Lb"))
             } else if (input$lbskg == 0 & input$lbskg2 == 1) {
                 deadlift_val <- test_deadlift(input$deadlift*0.453592)
-                deadlift_one <- pl_web_clean %>% filter(Deadlift3Kg == deadlift_val, Equipment == input$equipment, Sex == input$sex) %>% group_by(Deadlift1Kg) %>% 
-                    summarise(ratio = sum(Deadlift3SF/n()), Sample_Size = n()) %>% filter(ratio != 1) 
-                g <- ggplot(deadlift_one, aes(Deadlift1Kg, ratio, fill = Sample_Size)) + geom_col(aes(text = paste0(round(ratio*100), "% success on lift 3"))) + scale_fill_viridis_c() + 
-                    xlim(round(deadlift_val*0.8),deadlift_val-1) + theme_pubr(legend="right") + ylab("Ratio of success on Deadlift 3") + xlab("Deadlift 1 Weight (in kg)") + 
-                    labs(fill = "# of lifts") + scale_y_continuous(labels = percent)
+                deadlift_one <- pl_web_clean %>% filter(Deadlift3Kg == deadlift_val, Equipment == input$equipment, Sex == input$sex) %>% 
+                    group_by(Deadlift1Kg) %>% summarise(ratio = sum(Deadlift3SF/n()), Sample_Size = n()) %>% filter(ratio != 1) 
+                g <- ggplot(deadlift_one, aes(Deadlift1Kg, ratio, fill = Sample_Size)) + geom_col(aes(text = paste0(round(ratio*100), "% success on lift 3"))) + 
+                    scale_fill_viridis_c() + xlim(round(deadlift_val*0.8),deadlift_val-1) + theme_pubr(legend="right") + ylab("Ratio of success on Deadlift 3") 
+                + xlab("Deadlift 1 Weight (in kg)") + labs(fill = "# of lifts") + scale_y_continuous(labels = percent)
                 ggplotly(g, tooltip = c("Sample_Size", "text", "Deadlift1Kg"))
             } else if (input$lbskg == 1 & input$lbskg2 == 0) {
                 deadlift_val <- test_deadlift(input$deadlift)
-                deadlift_one <- pl_web_clean %>% filter(Deadlift3Kg == deadlift_val, Equipment == input$equipment, Sex == input$sex) %>% group_by(Deadlift1Kg) %>% 
-                    summarise(ratio = sum(Deadlift3SF/n()), Sample_Size = n()) %>% filter(ratio != 1) %>% mutate(Deadlift1Lb = Deadlift1Kg/0.453592)
-                g <- ggplot(deadlift_one, aes(Deadlift1Lb, ratio, fill = Sample_Size)) + geom_col(aes(text = paste0(round(ratio*100), "% success on lift 3"))) + scale_fill_viridis_c() + 
-                    xlim(round(deadlift_val*0.8/0.453592),deadlift_val/0.453592-1) + theme_pubr(legend="right") + ylab("Ratio of success on Deadlift 3") + xlab("Deadlift 1 Weight (in lbs)") + 
-                    labs(fill = "# of lifts") + scale_y_continuous(labels = percent)
+                deadlift_one <- pl_web_clean %>% filter(Deadlift3Kg == deadlift_val, Equipment == input$equipment, Sex == input$sex) %>% 
+                    group_by(Deadlift1Kg) %>% summarise(ratio = sum(Deadlift3SF/n()), Sample_Size = n()) %>% filter(ratio != 1) %>% 
+                    mutate(Deadlift1Lb = Deadlift1Kg/0.453592)
+                g <- ggplot(deadlift_one, aes(Deadlift1Lb, ratio, fill = Sample_Size)) + geom_col(aes(text = paste0(round(ratio*100), "% success on lift 3"))) + 
+                    scale_fill_viridis_c() + xlim(round(deadlift_val*0.8/0.453592),deadlift_val/0.453592-1) + theme_pubr(legend="right") + 
+                    ylab("Ratio of success on Deadlift 3") + xlab("Deadlift 1 Weight (in lbs)") + labs(fill = "# of lifts") + 
+                    scale_y_continuous(labels = percent)
                 ggplotly(g, tooltip = c("Sample_Size", "text", "Deadlift1Lb"))
             } else if (input$lbskg == 1 & input$lbskg2 == 1) {
                 deadlift_val <- test_deadlift(input$deadlift)
-                deadlift_one <- pl_web_clean %>% filter(Deadlift3Kg == deadlift_val, Equipment == input$equipment, Sex == input$sex) %>% group_by(Deadlift1Kg) %>% 
-                    summarise(ratio = sum(Deadlift3SF/n()), Sample_Size = n()) %>% filter(ratio != 1) 
-                g <- ggplot(deadlift_one, aes(Deadlift1Kg, ratio, fill = Sample_Size)) + geom_col(aes(text = paste0(round(ratio*100), "% success on lift 3"))) + scale_fill_viridis_c() + 
-                    xlim(round(deadlift_val*0.8),deadlift_val-1) + theme_pubr(legend="right") + ylab("Ratio of success on Deadlift 3") + xlab("Deadlift 1 Weight (in kg)") + 
-                    labs(fill = "# of lifts") + scale_y_continuous(labels = percent)
+                deadlift_one <- pl_web_clean %>% filter(Deadlift3Kg == deadlift_val, Equipment == input$equipment, Sex == input$sex) %>% 
+                    group_by(Deadlift1Kg) %>% summarise(ratio = sum(Deadlift3SF/n()), Sample_Size = n()) %>% filter(ratio != 1) 
+                g <- ggplot(deadlift_one, aes(Deadlift1Kg, ratio, fill = Sample_Size)) + geom_col(aes(text = paste0(round(ratio*100), "% success on lift 3"))) + 
+                    scale_fill_viridis_c() + xlim(round(deadlift_val*0.8),deadlift_val-1) + theme_pubr(legend="right") + ylab("Ratio of success on Deadlift 3") +
+                    xlab("Deadlift 1 Weight (in kg)") + labs(fill = "# of lifts") + scale_y_continuous(labels = percent)
                 ggplotly(g, tooltip = c("Sample_Size", "text", "Deadlift1Kg"))
             }
         }
         
     })
+    
+    #same as above
     output$deadlift2Plot <- renderPlotly({
-        # create a Deadlift histogram based off info from ui.R
         if (is.na(input$deadlift)|input$deadlift<0) {} else {
             if (input$lbskg == 0 & input$lbskg2 == 0) {
                 deadlift_val <- test_deadlift(input$deadlift*0.453592)
-                deadlift_two <- pl_web_clean %>% filter(Deadlift3Kg == deadlift_val, Equipment == input$equipment, Sex == input$sex) %>% group_by(Deadlift2Kg) %>% 
-                    summarise(ratio = sum(Deadlift3SF/n()), Sample_Size = n()) %>% filter(ratio != 1) %>% mutate(Deadlift2Lb = Deadlift2Kg/0.453592)
-                g <- ggplot(deadlift_two, aes(Deadlift2Lb, ratio, fill = Sample_Size)) + geom_col(aes(text = paste0(round(ratio*100), "% success on lift 3"))) + scale_fill_viridis_c() + 
-                    xlim(round(deadlift_val*0.8/0.453592),deadlift_val/0.453592-1) + theme_pubr(legend="right") + ylab("Ratio of success on Deadlift 3") + xlab("Deadlift 2 Weight (in lbs)") + 
-                    labs(fill = "# of lifts") + scale_y_continuous(labels = percent)
+                deadlift_two <- pl_web_clean %>% filter(Deadlift3Kg == deadlift_val, Equipment == input$equipment, Sex == input$sex) %>% 
+                    group_by(Deadlift2Kg) %>% summarise(ratio = sum(Deadlift3SF/n()), Sample_Size = n()) %>% filter(ratio != 1) %>% 
+                    mutate(Deadlift2Lb = Deadlift2Kg/0.453592)
+                g <- ggplot(deadlift_two, aes(Deadlift2Lb, ratio, fill = Sample_Size)) + geom_col(aes(text = paste0(round(ratio*100), "% success on lift 3"))) + 
+                    scale_fill_viridis_c() + xlim(round(deadlift_val*0.8/0.453592),deadlift_val/0.453592-1) + theme_pubr(legend="right") + 
+                    ylab("Ratio of success on Deadlift 3") + xlab("Deadlift 2 Weight (in lbs)") + labs(fill = "# of lifts") + 
+                    scale_y_continuous(labels = percent)
                 ggplotly(g, tooltip = c("Sample_Size", "text", "Deadlift2Lb"))
             } else if (input$lbskg == 0 & input$lbskg2 == 1) {
                 deadlift_val <- test_deadlift(input$deadlift*0.453592)
-                deadlift_two <- pl_web_clean %>% filter(Deadlift3Kg == deadlift_val, Equipment == input$equipment, Sex == input$sex) %>% group_by(Deadlift2Kg) %>% 
-                    summarise(ratio = sum(Deadlift3SF/n()), Sample_Size = n()) %>% filter(ratio != 1) 
-                g <- ggplot(deadlift_two, aes(Deadlift2Kg, ratio, fill = Sample_Size)) + geom_col(aes(text = paste0(round(ratio*100), "% success on lift 3"))) + scale_fill_viridis_c() + 
-                    xlim(round(deadlift_val*0.8),deadlift_val-1) + theme_pubr(legend="right") + ylab("Ratio of success on Deadlift 3") + xlab("Deadlift 2 Weight (in kg)") + 
-                    labs(fill = "# of lifts") + scale_y_continuous(labels = percent)
+                deadlift_two <- pl_web_clean %>% filter(Deadlift3Kg == deadlift_val, Equipment == input$equipment, Sex == input$sex) %>% 
+                    group_by(Deadlift2Kg) %>% summarise(ratio = sum(Deadlift3SF/n()), Sample_Size = n()) %>% filter(ratio != 1) 
+                g <- ggplot(deadlift_two, aes(Deadlift2Kg, ratio, fill = Sample_Size)) + geom_col(aes(text = paste0(round(ratio*100), "% success on lift 3"))) + 
+                    scale_fill_viridis_c() + xlim(round(deadlift_val*0.8),deadlift_val-1) + theme_pubr(legend="right") + ylab("Ratio of success on Deadlift 3") +
+                    xlab("Deadlift 2 Weight (in kg)") + labs(fill = "# of lifts") + scale_y_continuous(labels = percent)
                 ggplotly(g, tooltip = c("Sample_Size", "text", "Deadlift2Kg"))
             } else if (input$lbskg == 1 & input$lbskg2 == 0) {
                 deadlift_val <- test_deadlift(input$deadlift)
-                deadlift_two <- pl_web_clean %>% filter(Deadlift3Kg == deadlift_val, Equipment == input$equipment, Sex == input$sex) %>% group_by(Deadlift2Kg) %>% 
-                    summarise(ratio = sum(Deadlift3SF/n()), Sample_Size = n()) %>% filter(ratio != 1) %>% mutate(Deadlift2Lb = Deadlift2Kg/0.453592)
-                g <- ggplot(deadlift_two, aes(Deadlift2Lb, ratio, fill = Sample_Size)) + geom_col(aes(text = paste0(round(ratio*100), "% success on lift 3"))) + scale_fill_viridis_c() + 
-                    xlim(round(deadlift_val*0.8/0.453592),deadlift_val/0.453592-1) + theme_pubr(legend="right") + ylab("Ratio of success on Deadlift 3") + xlab("Deadlift 2 Weight (in lbs)") + 
-                    labs(fill = "# of lifts") + scale_y_continuous(labels = percent)
+                deadlift_two <- pl_web_clean %>% filter(Deadlift3Kg == deadlift_val, Equipment == input$equipment, Sex == input$sex) %>% 
+                    group_by(Deadlift2Kg) %>% summarise(ratio = sum(Deadlift3SF/n()), Sample_Size = n()) %>% filter(ratio != 1) %>% 
+                    mutate(Deadlift2Lb = Deadlift2Kg/0.453592)
+                g <- ggplot(deadlift_two, aes(Deadlift2Lb, ratio, fill = Sample_Size)) + geom_col(aes(text = paste0(round(ratio*100), "% success on lift 3"))) + 
+                    scale_fill_viridis_c() + xlim(round(deadlift_val*0.8/0.453592),deadlift_val/0.453592-1) + theme_pubr(legend="right") + 
+                    ylab("Ratio of success on Deadlift 3") + xlab("Deadlift 2 Weight (in lbs)") + labs(fill = "# of lifts") + 
+                    scale_y_continuous(labels = percent)
                 ggplotly(g, tooltip = c("Sample_Size", "text", "Deadlift2Lb"))
             } else if (input$lbskg == 1 & input$lbskg2 == 1) {
                 deadlift_val <- test_deadlift(input$deadlift)
-                deadlift_two <- pl_web_clean %>% filter(Deadlift3Kg == deadlift_val, Equipment == input$equipment, Sex == input$sex) %>% group_by(Deadlift2Kg) %>% 
-                    summarise(ratio = sum(Deadlift3SF/n()), Sample_Size = n()) %>% filter(ratio != 1) 
-                g <- ggplot(deadlift_two, aes(Deadlift2Kg, ratio, fill = Sample_Size)) + geom_col(aes(text = paste0(round(ratio*100), "% success on lift 3"))) + scale_fill_viridis_c() + 
-                    xlim(round(deadlift_val*0.8),deadlift_val-1) + theme_pubr(legend="right") + ylab("Ratio of success on Deadlift 3") + xlab("Deadlift 2 Weight (in kg)") + 
-                    labs(fill = "# of lifts") + scale_y_continuous(labels = percent)
+                deadlift_two <- pl_web_clean %>% filter(Deadlift3Kg == deadlift_val, Equipment == input$equipment, Sex == input$sex) %>% 
+                    group_by(Deadlift2Kg) %>% summarise(ratio = sum(Deadlift3SF/n()), Sample_Size = n()) %>% filter(ratio != 1) 
+                g <- ggplot(deadlift_two, aes(Deadlift2Kg, ratio, fill = Sample_Size)) + geom_col(aes(text = paste0(round(ratio*100), "% success on lift 3"))) + 
+                    scale_fill_viridis_c() + xlim(round(deadlift_val*0.8),deadlift_val-1) + theme_pubr(legend="right") + ylab("Ratio of success on Deadlift 3") +
+                    xlab("Deadlift 2 Weight (in kg)") + labs(fill = "# of lifts") + scale_y_continuous(labels = percent)
                 ggplotly(g, tooltip = c("Sample_Size", "text", "Deadlift2Kg"))
             }
         }
         
     })
+    
+    #have text available for displaying a remarkable lifter (top 1%)
     output$example_lifter <- renderText({
         null_lifter <- F
-        if(is.na(input$weight)) {
+        if(is.na(input$weight)) { #if no weight listed, print nothing
             paste0("")
         } else {
+            #filter for lifter near input weight 
         example_lifter <- pl_top01 %>% filter(Sex == input$sex, abs(BodyweightKg-ifelse(input$lbskg==1,input$weight,input$weight*0.453592)) < 2, 
                                               Equipment == input$equipment)
-        if (nrow(example_lifter) == 0) {
+        if (nrow(example_lifter) == 0) { #change from lbs to kg if entering in lbs
             example_lifter <- pl_top01 %>% filter(Sex == input$sex, abs(BodyweightKg-ifelse(input$lbskg==1,input$weight,input$weight*0.453592)) < 5, 
                                                   Equipment == input$equipment)
-            if (nrow(example_lifter) == 0) {
+            if (nrow(example_lifter) == 0) { #if no lifters found, set value to true
                 null_lifter <- T
             }
         }
         random_nums <- runif(nrow(example_lifter))
         index <- which.max(random_nums)
-        explain_lifter <- example_lifter[index,]
+        explain_lifter <- example_lifter[index,] #use random uniform variable to sample from list of lifters near your weight 
 
 
-        if (null_lifter == T) {
+        if (null_lifter == T) { #do nothing if null lifter
             paste0("")
         } else {
-            if (input$lbskg2 == 0) {
+            if (input$lbskg2 == 0) { #print using if-else statements for gender to print out statement about lifter
                 paste0("Did you know? On ", explain_lifter$Date, ", ", explain_lifter$Name, " lifted an incredible ", round(explain_lifter$TotalKg/0.453592), 
                        "lbs while weighing ", round(explain_lifter$BodyweightKg/0.453592), " lbs, meaning", ifelse(input$sex =="M", " he", " she"), " lifted ",
                        round(explain_lifter$BwRRaw,2), "x", ifelse(input$sex =="M", " his", " her"), " body weight.", ifelse(input$sex == "M", " His", " Her"), 
@@ -768,6 +802,8 @@ server <- function(input, output) {
         }
         }
     })
+    
+    #not used now, shows Dots score for usage instead of Wilks score
     output$ref <- renderUI({
         tagList("", a("Dots score reference", href="https://drive.google.com/drive/folders/1-0rE_GbYWVum7U1UfpR0XWiFR9ZNbXWJ"))
     })
