@@ -1,7 +1,11 @@
 Powerlifting calculator
 ================
-Brian Tow
-12/6/2020
+For the past few years I have been doing a powerlifting style of
+strength training. I have created a calculator to help those competing
+in powerlifting meets in order to maximize their performance.
+Powerlifting meets/competitions have a simple structure: there are three
+lifts, squat/bench press/deadlift, and for each lift you get three
+attempts to lift the highest weight possible.
 
 ## Project Summary
 
@@ -13,8 +17,9 @@ Brian Tow
 
 <li>
 
-Created a website using Shiny to help powerlifters predict and visualize
-their competition lift attempts
+Created a [website](https://bdt833.shinyapps.io/Powerlifting_Calc/)
+using Shiny to help powerlifters predict and visualize their competition
+lift attempts
 
 </li>
 
@@ -66,11 +71,52 @@ powerlifting <- read_csv("openpowerlifting-2020-10-16.csv",
 miss_var_summary(powerlifting) %>% as.data.frame() #convert to data.frame to view non-truncated results
 ```
 
+    ##            variable  n_miss   pct_miss
+    ## 1          Squat4Kg 2110489 99.7385659
+    ## 2       Deadlift4Kg 2101762 99.3261409
+    ## 3          Bench4Kg 2101176 99.2984474
+    ## 4          Squat3Kg 1624863 76.7886046
+    ## 5          Squat2Kg 1609760 76.0748594
+    ## 6          Squat1Kg 1603646 75.7859208
+    ## 7       Deadlift3Kg 1577455 74.5481732
+    ## 8       Deadlift2Kg 1550635 73.2807000
+    ## 9       Deadlift1Kg 1538770 72.7199777
+    ## 10         Bench3Kg 1340146 63.3333034
+    ## 11         Bench2Kg 1313809 62.0886560
+    ## 12         Bench1Kg 1303229 61.5886610
+    ## 13          Country 1042303 49.2576870
+    ## 14              Age  886464 41.8929680
+    ## 15   BirthYearClass  831286 39.2853379
+    ## 16 ParentFederation  811616 38.3557630
+    ## 17     Best3SquatKg  688194 32.5230232
+    ## 18         AgeClass  678603 32.0697668
+    ## 19        MeetState  584444 27.6199527
+    ## 20  Best3DeadliftKg  579130 27.3688210
+    ## 21           Tested  574609 27.1551653
+    ## 22         Goodlift  337146 15.9330177
+    ## 23         MeetTown  255475 12.0733679
+    ## 24     Best3BenchKg  252501 11.9328211
+    ## 25             Dots  173514  8.2000131
+    ## 26            Wilks  173514  8.2000131
+    ## 27     Glossbrenner  173514  8.2000131
+    ## 28          TotalKg  154561  7.3043226
+    ## 29     BodyweightKg   28921  1.3667634
+    ## 30    WeightClassKg   24481  1.1569356
+    ## 31         Division    2694  0.1273144
+    ## 32             Name       0  0.0000000
+    ## 33              Sex       0  0.0000000
+    ## 34            Event       0  0.0000000
+    ## 35        Equipment       0  0.0000000
+    ## 36            Place       0  0.0000000
+    ## 37       Federation       0  0.0000000
+    ## 38             Date       0  0.0000000
+    ## 39      MeetCountry       0  0.0000000
+    ## 40         MeetName       0  0.0000000
+
 This shows us that some identifier variables (Name, Sex, Event, Date,
 etc) have no missing data, but there is a substantial amount of missing
-data in other descriptors. Luckily, I don’t really care about a large
-majority of these descriptors and only want the raw numbers. I’ll drop
-the irrelevant ones:
+data in other descriptors. Luckily, a large majority of these
+descriptors are not of interested, so I’ll drop the irrelevant ones:
 
 ``` r
 pl_filter <- powerlifting %>% select(-Country, -BirthYearClass, -Federation, -Date,
@@ -117,16 +163,16 @@ gg_miss_var(pl_filter)
 
 ![](project_files/figure-gfm/unnamed-chunk-3-1.png)<!-- -->
 
-A vast majority of the missing data is from the actual lifts themselves,
-and not the other descriptors. It turns out that many of the recorded
-lifts have only the Total Kg lifted, not the individual lifts. I am
-interested in the numbers for the individual lifts, and since there is
-no way to impute missing data I will simply drop entries with missing
-lift values. Further, I am only interested in the “SBD” event, which has
-all three lifts.
+The variables corresponding to the individual lifts contain a vast
+majority of the missing data because many of the lifts only list the
+TotalKg lifted. I am interested in the weights of the individual lifts,
+and since there is no way to impute missing data, I will simply drop
+entries with missing values. Further, I am only interested in the “SBD”
+event, which has all three lifts.
 
 ``` r
-pl_filter2 <- pl_filter %>% filter(Event == "SBD") %>% filter(is.na(Squat1Kg) == F, is.na(Bench1Kg) == F, is.na(Deadlift1Kg) == F) %>%
+pl_filter2 <- pl_filter %>% filter(Event == "SBD") %>% 
+  filter(is.na(Squat1Kg) == F, is.na(Bench1Kg) == F, is.na(Deadlift1Kg) == F) %>%
   filter(is.na(Squat2Kg) == F, is.na(Bench2Kg) == F, is.na(Deadlift2Kg) == F) %>% 
   filter(is.na(Squat3Kg) == F, is.na(Bench3Kg) == F, is.na(Deadlift3Kg) == F) %>%
   filter(is.na(Best3SquatKg) == F, is.na(Best3BenchKg) == F, is.na(Best3DeadliftKg) == F) %>% 
@@ -138,8 +184,7 @@ nrow(pl_filter2)/nrow(pl_filter) #only 20% of the data remains
 
     ## [1] 0.2017352
 
-Now that that’s out of the way, let’s check the summary statistics and
-go from there:
+Let’s check the summary statistics and go from there:
 
 ``` r
 summary(pl_filter2)
@@ -204,31 +249,40 @@ summary(pl_filter2)
 
 ``` r
 #remove data categories with too low of a sample size and do some feature engineering
-pl_filter3 <- pl_filter2 %>% mutate(Tested = as.factor(ifelse(is.na(Tested) == F, "Yes", "No"))) %>% #NA values in tested means untested
+pl_filter3 <- pl_filter2 %>% 
+  mutate(Tested = as.factor(ifelse(is.na(Tested) == F, "Yes", "No"))) %>% #NA values = untested
   filter((Equipment != "Straps" & Equipment != "Unlimited"), Sex != "Mx") %>% 
-  mutate(Squat2J = (abs(Squat2Kg) - abs(Squat1Kg))) %>% #creating variables to show the jumps from <lift>1 to <lift>2
+  mutate(Squat2J = (abs(Squat2Kg) - abs(Squat1Kg))) %>% #variables to show the jumps from attempt 1 to 2
   mutate(Bench2J = (abs(Bench2Kg) - abs(Bench1Kg))) %>% 
   mutate(Dead2J = (abs(Deadlift2Kg) - abs(Deadlift1Kg))) %>%
-  mutate(Squat3J = (abs(Squat3Kg) - abs(Squat2Kg))) %>% #same but with <lift>2 to <lift>3
+  mutate(Squat3J = (abs(Squat3Kg) - abs(Squat2Kg))) %>% #same but with attempt 2 to 3
   mutate(Bench3J = (abs(Bench3Kg) - abs(Bench2Kg))) %>% 
   mutate(Dead3J = (abs(Deadlift3Kg) - abs(Deadlift2Kg))) %>%
-  mutate(Squat1SF = ifelse(Squat1Kg > 0, 1, 0), Squat2SF = ifelse(Squat2Kg > 0, 1, 0), Squat3SF = ifelse(Squat3Kg > 0, 1, 0)) %>% #dummy variable for success of lift
-  mutate(Bench1SF = ifelse(Bench1Kg > 0, 1, 0), Bench2SF = ifelse(Bench2Kg > 0, 1, 0), Bench3SF = ifelse(Bench3Kg > 0, 1, 0)) %>%
-  mutate(Deadlift1SF = ifelse(Deadlift1Kg > 0, 1, 0), Deadlift2SF = ifelse(Deadlift2Kg > 0, 1, 0), Deadlift3SF = ifelse(Deadlift3Kg > 0, 1, 0)) %>%
-  mutate_at(c("Squat1Kg", "Squat2Kg", "Squat3Kg", "Bench1Kg", "Bench2Kg", "Bench3Kg", "Deadlift1Kg", "Deadlift2Kg", "Deadlift3Kg"), ~abs(.)) #negative numbers were failed lifts
+  mutate(Squat1SF = ifelse(Squat1Kg > 0, 1, 0), 
+         Squat2SF = ifelse(Squat2Kg > 0, 1, 0), 
+         Squat3SF = ifelse(Squat3Kg > 0, 1, 0)) %>% #dummy variable for success of lift
+  mutate(Bench1SF = ifelse(Bench1Kg > 0, 1, 0), 
+         Bench2SF = ifelse(Bench2Kg > 0, 1, 0), 
+         Bench3SF = ifelse(Bench3Kg > 0, 1, 0)) %>%
+  mutate(Deadlift1SF = ifelse(Deadlift1Kg > 0, 1, 0), 
+         Deadlift2SF = ifelse(Deadlift2Kg > 0, 1, 0), 
+         Deadlift3SF = ifelse(Deadlift3Kg > 0, 1, 0)) %>%
+  mutate_at(c("Squat1Kg", "Squat2Kg", "Squat3Kg", 
+              "Bench1Kg", "Bench2Kg", "Bench3Kg", 
+              "Deadlift1Kg", "Deadlift2Kg", "Deadlift3Kg"), ~abs(.)) #negative numbers = failed lifts
 
 #refactor Sex, Equipment groups
 pl_filter3$Sex <- factor(pl_filter3$Sex)
 pl_filter3$Equipment <- factor(pl_filter3$Equipment)
 ```
 
-We still have a lot of work to do. There are some data without an age,
-age class, bodyweight, or weight class; I could potentially impute the
-data from age class and weight class, or vice versa, but I will simply
-drop age/weight class and missing bodyweight values. There are a
-substantial amount of ageless competitors, so I will use an indicator
-number of age = 0 to mean this data is missing. Further, there are some
-typos or data entry issues, which will be filtered out.
+There is still a lot of work to do. There are some entries without an
+age, age class, bodyweight, or weight class; I could potentially impute
+the data from age class and weight class, or vice versa, but I will
+simply drop age/weight class and missing bodyweight values. There are a
+substantial amount of “ageless” competitors, so I will use an indicator
+number of age = 0 to signify that the value is missing. Further, there
+are some typos or data entry issues that I will filter out.
 
 ``` r
 pl_filter3 %>% filter(Age < 16) %>% ggplot(aes(TotalKg)) + geom_histogram(bins = 30) 
@@ -237,19 +291,28 @@ pl_filter3 %>% filter(Age < 16) %>% ggplot(aes(TotalKg)) + geom_histogram(bins =
 ![](project_files/figure-gfm/unnamed-chunk-6-1.png)<!-- -->
 
 It’s a bit unrealistic for lifters under 16 to have lifted over 500kg.
+I’ll change the age of anyone under 16 to have age = 0. In addition, I
+will create a bodyweight ratio variable and scale bodyweight ratio,
+Wilks score, and Dots score so as to be comparable to each other. Then,
+I create a compiled Dots and compiled Wilks score by averaging the
+scaled bodyweight ratio and respective score value. Dots and Wilks
+scores are absolute numbers that are used to compare your strength to
+other lifters; a higher number is better.
 
 ``` r
+#change any NAs to 0 and change any lifter under age 16 to have age = 0 
 pl_filter3$Age[is.na(pl_filter3$Age) == T] <- 0
 pl_filter3$Age[pl_filter3$Age < 16] <- 0
 
 pl_filter4 <- pl_filter3 %>% select(-AgeClass, -WeightClassKg) %>%
   filter(!is.na(BodyweightKg) == T, !is.na(TotalKg) == T) %>%
-  filter(Squat2J < 100, Bench2J < 100, Dead2J < 100) %>% #highly unlikely that anyone will jump 100kg+ between attempts
+  filter(Squat2J < 100, Bench2J < 100, Dead2J < 100) %>% #unlikely that anyone will jump 100kg+ between attempts
   filter(Squat3J < 100, Bench3J < 100, Dead3J < 100) %>%
   mutate(BwRatio = TotalKg / BodyweightKg) %>% #weight lifted:bodyweight ratio
-  mutate(WilksRaw = Wilks, BwRRaw = BwRatio, DotsRaw = Dots) %>% mutate_at(c("Wilks", "BwRatio", "Dots"), 
-                                                                           ~(scale(.) %>% as.vector)) %>% #scale Wilks/Dots/BwRatio and save the raw values
-  mutate(CompWilks = (Wilks + BwRatio)/2, CompDots = (Dots + BwRatio)/2) #create a composite score of scaled values to create a strength index
+  mutate(WilksRaw = Wilks, BwRRaw = BwRatio, DotsRaw = Dots) %>% 
+  mutate_at(c("Wilks", "BwRatio", "Dots"), 
+            ~(scale(.) %>% as.vector)) %>% #scale Wilks/Dots/BwRatio and save the raw values
+  mutate(CompWilks = (Wilks + BwRatio)/2, CompDots = (Dots + BwRatio)/2) #create a composite score  
 
 miss_var_summary(pl_filter4)
 ```
@@ -276,11 +339,11 @@ pl_noage <- pl_filter4 %>% filter(Age == 0)
 pl_final <- pl_filter4 %>% filter(Age != 0)
 ```
 
-Finally\! Our data is looking nice and clean except for the 4th attempt
-lifts. These are reserved for world-record breaking lift attempts, so
-these numbers will be left in for now. The Wilks and Dots scores are
-coefficients used to compare lifters among different weightclasses and
-genders, and a higher number is better. There has been [recent
+Finally\! Our data is looking nice and clean except for attempt 4. These
+are reserved for world-record breaking lift attempts, and these numbers
+will be left in for now. The Wilks and Dots scores are coefficients used
+to compare lifters among different weightclasses and genders, and a
+higher number is better. There has been [recent
 research](https://drive.google.com/drive/folders/1-0rE_GbYWVum7U1UfpR0XWiFR9ZNbXWJ)
 showing that Dots score is a fairer metric, but I have included both.
 Now, onto some visualizations/interesting statistics.
@@ -293,14 +356,17 @@ Now, onto some visualizations/interesting statistics.
 
 <summary>Open/close</summary>
 
+First, I want to see the overall success rate of each lift for the three
+attempts in competition. Below is the code outlining that:
+
 ``` r
 library(ggplot2)
 library(ggpubr)
 #find the success rate of each lift for each attempt
-lifts_SF <- as_tibble(matrix(c(mean(pl_final$Squat1SF), mean(pl_final$Bench1SF), mean(pl_final$Deadlift1SF), 
+lifts_SF <- as_tibble(as.data.frame(matrix(c(mean(pl_final$Squat1SF), mean(pl_final$Bench1SF), mean(pl_final$Deadlift1SF), 
                                mean(pl_final$Squat2SF), mean(pl_final$Bench2SF), mean(pl_final$Deadlift2SF),
                                mean(pl_final$Squat3SF), mean(pl_final$Bench3SF), mean(pl_final$Deadlift3SF)),
-                             byrow = T, nrow = 3))
+                             byrow = T, nrow = 3)))
 lifts_SF <- lifts_SF %>% gather("Lift", "Ratio")
 lifts_SF$Lift <- c(rep("Squat", 3), rep("Bench", 3), rep("Deadlift", 3))
 lifts_SF$Attempt <- rep(c(1,2,3), 3)
@@ -311,11 +377,19 @@ lifts_SF %>% ggplot(aes(Attempt, Ratio, col = Lift)) +
   geom_line()
 ```
 
-Looks like on attempts 1 and 2, the lifts are fairly well-balanced for
-success ratio. Bench press suffers from a much lower ratio of success on
-lift 3, though. This could mean either lifters already get a successful
-lift they are comfortable with on lift 2 and overreach on lift 3, or
-that lifters should in general aim for a safer lift attempt on lift 3.
+![](project_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
+
+It looks like on attempts 1 and 2, the lifts are fairly well-balanced
+for success ratio. Bench press suffers from a much lower ratio of
+success on lift 3, though. This could mean either lifters already get a
+successful lift they are comfortable with on lift 2 and overreach on
+lift 3, or that lifters should in general aim for a safer lift attempt
+on lift 3.
+
+Next, I will look at the top 0.1% of powerlifters for each Equipment
+category and get some idea of their strength metrics (Dots score,
+bodyweight ratio). The top powerlifters were those with the highest
+compiled Dots score.
 
 ``` r
 #find the top 0.1% of powerlifters for each of the categories below, measured by compiled Dots score 
@@ -370,8 +444,16 @@ pl_top001 %>% select(Name, CompDots, Dots, BwRatio, Equipment, BodyweightKg) %>%
 A couple of interesting things here. The top two athletes in the Raw
 equipment class are both dwarfs. Their lower body weight, range of
 motion, and better leverage allow for some incredibly impressive lifts.
-Lower weight athletes dominate the bodyweight ratio category, but there
-are some impressive people like John Haack that defy the odds.
+Lower weight athletes dominate by having a higher bodyweight ratio, but
+there are some impressive competitors like John Haack and Marianna
+Gasparyan that have stellar Dots scores.
+
+Below are two plots examining the raw Dots score and raw bodyweight
+ratio of the top 0.1% of lifters. The first plot shows that a majority
+of the elite powerlifters weigh around 70kg or less. You can see in the
+second plot that the single-/multi-ply group have a much larger raw Dots
+score *and* bodyweight ratio compared to all other equipment categories,
+making them unique in the powerlifting world.
 
 ``` r
 #plots
@@ -391,10 +473,6 @@ pl_top001 %>% ggplot(aes(BwRRaw, DotsRaw, col = Equipment)) +
 
 ![](project_files/figure-gfm/unnamed-chunk-11-2.png)<!-- -->
 
-You can see here that the single-/multi-ply group have a much larger raw
-Dots score *and* bodyweight ratio compared to all other equipment
-categories, making them unique in the powerlifting world.
-
 </details>
 
 ## Model building
@@ -402,6 +480,9 @@ categories, making them unique in the powerlifting world.
 <details>
 
 <summary>Open/close</summary>
+
+Before modeling, I want to take a look at the data’s correlation matrix,
+as shown below.
 
 ``` r
 library(corrplot)
@@ -414,19 +495,23 @@ pl_cor_matrix <- cor(pl_corr)
 corrplot(pl_cor_matrix, type = "lower", tl.col = "black", tl.srt = 45)
 ```
 
-Besides age, this data is all correlated, and in fact is highly linear
-due to the nature of powerlifting. Thus, I will be building several
-models to predict Squat1Kg given a desired Squat3Kg input. In doing so,
-I will predict on a smaller subset of data using only lifts that were
-successful, as I want to create a model to emulate the most successful
-powerlifters. I will look at simple linear regression, elastic net
-regression, and random forest regression. I will be using R’s tidymodels
+![](project_files/figure-gfm/unnamed-chunk-13-1.png)<!-- -->
+
+Except age, this data is all correlated and the variables in each lift
+category are highly linear. Simple linear regression, elastic net
+regression, and random forest regression are three common algorithms
+employed in predictive modeling. I will use the squat data to evaluate
+predictive model performance on the three lifts categories. In doing so,
+a smaller subset of data using only successful lifts will be used for
+predicting, as I want to create models to emulate the most successful
+powerlifters. The regressive models will be fit using R’s tidymodels
 library, which acts as a unified modeling framework similar to Python’s
 scikit-learn.
 
 ``` r
 library(tidymodels)
-pl_model <- pl_final %>% filter(Squat1SF == 1, Squat2SF == 1, Bench1SF == 1, Bench2SF == 1, Deadlift1SF == 1, Deadlift2SF == 1)
+pl_model <- pl_final %>% 
+  filter(Squat1SF == 1, Squat2SF == 1, Bench1SF == 1, Bench2SF == 1, Deadlift1SF == 1, Deadlift2SF == 1)
 
 #create split data included train and test sets
 set.seed(2222)
@@ -488,8 +573,8 @@ best_glm <- select_best(glm_tune, metric = "rmse")
 glm_wf %>% finalize_workflow(best_glm) %>% fit_resamples(pl_cv_fold) %>% collect_metrics()
 
 
-#random forest model, repeating the same steps as the LM
-ranger_model <- rand_forest(seed = 1, splitrule = "extratrees") %>% #attempt at using extratrees to boost the training speed
+#random forest model, repeating the same steps as the LM, using extratrees to decrease training time
+ranger_model <- rand_forest(seed = 1, splitrule = "extratrees") %>%
   set_engine("ranger") %>%
   set_mode("regression")
 
@@ -501,15 +586,20 @@ ranger_wf <- workflow() %>%
 ranger_wf %>% fit_resamples(pl_cv_fold) %>% collect_metrics()
 ```
 
-Elastic net and linear regression give about the same results of RMSE ≈
-6.75, while random forests are (under default settings) a lot less
-accurate with RMSE = 16.4. Random forests are slow to train on this data
-set, and I do not require variable importance, so I forgo any further
-tuning of the model. Elastic net and linear regression give the same
-results, so I use the simpler linear model to deploy to the web app for
-sake of ease. However, the linear model is almost unnecessary, as the
-lifts can generally be calculated by taking 90% and 90% of <lift>3Kg to
-calculate lift 1 and 2, respectively.
+Elastic net and linear regression have similar results of RMSE ≈ 6.75,
+while random forests are a lot more error-prone with RMSE = 16.4 under
+default settings. Random forests are slow to train on this data set, and
+I do not require information about variable importance, so I forgo any
+further tuning of the model. Elastic net and linear regression give the
+same results, but linear regression was the model I used because it is
+the fastest and simplest to fit and train. These models were only
+evaluated for predicting Squat1Kg, but due to the highly correlated
+nature of the data, it is safe to employ the same model framework for
+predicting the others lifts.
+
+Having said all of this, the linear model is almost superfluous; the
+lifts can generally (and more simply) be calculated by taking 90% and
+95% of attempt 3 to calculate attempt 1 and 2, respectively.
 
 </details>
 
@@ -519,10 +609,10 @@ calculate lift 1 and 2, respectively.
 
 <summary>Open/close</summary>
 
-Before deploying the website, models for each <lift>1Kg and <lift>2Kg
-need to be fit, and then they need to be stripped to reduce disk size.
-The dataset also needs to be stripped down. I also create some
-additional information to be loaded in with the Shiny app.
+Before deploying the website, models for each attempt need to be fit and
+stripped down to reduce disk size. The dataset also needs to be stripped
+down. Lastly, I create some additional information to be loaded in with
+the Shiny app.
 
 ``` r
 library(strip) #removes extra baggage from LM models, keeps only predictive information
@@ -549,12 +639,27 @@ user_info <- setNames(data.frame(20, factor("M"), 70, factor("Single-ply"), 140,
                       c("Age", "Sex", "BodyweightKg", "Equipment", "Squat3Kg", "Bench3Kg", "Deadlift3Kg"))
 
 #create full data.frame (includes 0 age group) with only relevant lift information
-pl_web_clean <- pl_filter4 %>% select(-Best3SquatKg, -Best3BenchKg, -Best3DeadliftKg, -Dots, -Wilks, -Tested, -BwRatio, -WilksRaw, -BwRRaw, -DotsRaw, -CompWilks, -CompDots, -Squat2J, -Bench2J, -Dead2J, -Squat3J, -Bench3J, -Dead3J, -Squat4Kg, -Bench4Kg, -Deadlift4Kg)
+pl_web_clean <- pl_filter4 %>% select(-Best3SquatKg, -Best3BenchKg, -Best3DeadliftKg, 
+                                      -Dots, -Wilks, -Tested, -BwRatio, -WilksRaw, -BwRRaw, 
+                                      -DotsRaw, -CompWilks, -CompDots, -Squat2J, -Bench2J, -Dead2J, 
+                                      -Squat3J, -Bench3J, -Dead3J, -Squat4Kg, -Bench4Kg, -Deadlift4Kg)
 
-#find lifts that only have >100 lift attempts for that weight to find the common lifts; due to weight conversions, sample size may be < 20
-squat_sampsize <- pl_web_clean %>% group_by(Squat3Kg) %>% summarize(Sample_Size = n()) %>% filter(Sample_Size > 100)
-bench_sampsize <- pl_web_clean %>% group_by(Bench3Kg) %>% summarize(Sample_Size = n()) %>% filter(Sample_Size > 100)
-deadlift_sampsize <- pl_web_clean %>% group_by(Deadlift3Kg) %>% summarize(Sample_Size = n()) %>% filter(Sample_Size > 100)
+
+#find lifts that only have >100 lift attempts for that weight to find the common lifts for visualizations
+squat_sampsize <- pl_web_clean %>% 
+  group_by(Squat3Kg) %>% 
+  summarize(Sample_Size = n()) %>% 
+  filter(Sample_Size > 100)
+
+bench_sampsize <- pl_web_clean %>% 
+  group_by(Bench3Kg) %>% 
+  summarize(Sample_Size = n()) %>% 
+  filter(Sample_Size > 100)
+
+deadlift_sampsize <- pl_web_clean %>% 
+  group_by(Deadlift3Kg) %>% 
+  summarize(Sample_Size = n()) %>% 
+  filter(Sample_Size > 100)
 
 #create a top 1% lifter group
 pl_top01 <- pl_final %>% 
@@ -565,11 +670,13 @@ pl_top01 <- pl_final %>%
                      Best3DeadliftKg, TotalKg, DotsRaw, BwRRaw, CompDots, Tested) 
 
 #save this as an .RData file to be loaded into the web app
-save(Squat1Kg_model, Squat2Kg_model, Bench1Kg_model, Bench2Kg_model, Deadlift1Kg_model, Deadlift2Kg_model, pl_web_clean, squat_sampsize, bench_sampsize, deadlift_sampsize, user_info, pl_top01, file = "PL_Web.RData")
+save(Squat1Kg_model, Squat2Kg_model, Bench1Kg_model, Bench2Kg_model, Deadlift1Kg_model, 
+     Deadlift2Kg_model, pl_web_clean, squat_sampsize, bench_sampsize, deadlift_sampsize, 
+     user_info, pl_top01, file = "PL_Web.RData")
 ```
 
 The dataset pl\_web\_clean has data from the age = 0 group of lifters,
-but this information is used only for plotting relevant lift numbers and
+but this information is used only for plotting lift information and
 calculating success rate of certain lifts.
 
 </details>
