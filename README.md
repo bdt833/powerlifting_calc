@@ -514,7 +514,9 @@ scikit-learn.
 ``` r
 library(tidymodels)
 pl_model <- pl_final %>% 
-  filter(Squat1SF == 1, Squat2SF == 1, Bench1SF == 1, Bench2SF == 1, Deadlift1SF == 1, Deadlift2SF == 1)
+  filter(Squat1SF == 1, Squat2SF == 1, 
+         Bench1SF == 1, Bench2SF == 1, 
+         Deadlift1SF == 1, Deadlift2SF == 1)
 
 #create split data included train and test sets
 set.seed(2222)
@@ -652,11 +654,12 @@ user_info <- setNames(data.frame(20, factor("M"), 70, factor("Single-ply"), 140,
 #create full data.frame (includes 0 age group) with only relevant lift information
 pl_web_clean <- pl_filter4 %>% select(-Best3SquatKg, -Best3BenchKg, -Best3DeadliftKg, 
                                       -Dots, -Wilks, -Tested, -BwRatio, -WilksRaw, -BwRRaw, 
-                                      -DotsRaw, -CompWilks, -CompDots, -Squat2J, -Bench2J, -Dead2J, 
-                                      -Squat3J, -Bench3J, -Dead3J, -Squat4Kg, -Bench4Kg, -Deadlift4Kg)
+                                      -DotsRaw, -CompWilks, -CompDots, -Squat2J, -Bench2J, 
+                                      -Dead2J, -Squat3J, -Bench3J, -Dead3J, -Squat4Kg, 
+                                      -Bench4Kg, -Deadlift4Kg)
 
 
-#find lifts that only have >100 lift attempts for that weight to find the common lifts for visualizations
+#find lifts that only have >100  attempts for that weight to find the common lifts for visualizations
 squat_sampsize <- pl_web_clean %>% 
   group_by(Squat3Kg) %>% 
   summarize(Sample_Size = n()) %>% 
