@@ -68,7 +68,8 @@ library(naniar)
 powerlifting <- read_csv("openpowerlifting-2020-10-16.csv", 
                          col_types = "cfffdfffdfddddddddddddddddfddddffffDffff")
 
-miss_var_summary(powerlifting) %>% as.data.frame() #convert to data.frame to view non-truncated results
+#convert to data.frame to view non-truncated results
+miss_var_summary(powerlifting) %>% as.data.frame() 
 ```
 
     ##            variable  n_miss   pct_miss
@@ -252,7 +253,7 @@ summary(pl_filter2)
 pl_filter3 <- pl_filter2 %>% 
   mutate(Tested = as.factor(ifelse(is.na(Tested) == F, "Yes", "No"))) %>% #NA values = untested
   filter((Equipment != "Straps" & Equipment != "Unlimited"), Sex != "Mx") %>% 
-  mutate(Squat2J = (abs(Squat2Kg) - abs(Squat1Kg))) %>% #variables to show the jumps from attempt 1 to 2
+  mutate(Squat2J = (abs(Squat2Kg) - abs(Squat1Kg))) %>% #variables to show attempt 1->2 jump
   mutate(Bench2J = (abs(Bench2Kg) - abs(Bench1Kg))) %>% 
   mutate(Dead2J = (abs(Deadlift2Kg) - abs(Deadlift1Kg))) %>%
   mutate(Squat3J = (abs(Squat3Kg) - abs(Squat2Kg))) %>% #same but with attempt 2 to 3
@@ -269,7 +270,7 @@ pl_filter3 <- pl_filter2 %>%
          Deadlift3SF = ifelse(Deadlift3Kg > 0, 1, 0)) %>%
   mutate_at(c("Squat1Kg", "Squat2Kg", "Squat3Kg", 
               "Bench1Kg", "Bench2Kg", "Bench3Kg", 
-              "Deadlift1Kg", "Deadlift2Kg", "Deadlift3Kg"), ~abs(.)) #negative numbers = failed lifts
+              "Deadlift1Kg", "Deadlift2Kg", "Deadlift3Kg"), ~abs(.)) #change all to positive
 
 #refactor Sex, Equipment groups
 pl_filter3$Sex <- factor(pl_filter3$Sex)
@@ -306,7 +307,7 @@ pl_filter3$Age[pl_filter3$Age < 16] <- 0
 
 pl_filter4 <- pl_filter3 %>% select(-AgeClass, -WeightClassKg) %>%
   filter(!is.na(BodyweightKg) == T, !is.na(TotalKg) == T) %>%
-  filter(Squat2J < 100, Bench2J < 100, Dead2J < 100) %>% #unlikely that anyone will jump 100kg+ between attempts
+  filter(Squat2J < 100, Bench2J < 100, Dead2J < 100) %>% #unlikely that anyone will jump 100kg+ 
   filter(Squat3J < 100, Bench3J < 100, Dead3J < 100) %>%
   mutate(BwRatio = TotalKg / BodyweightKg) %>% #weight lifted:bodyweight ratio
   mutate(WilksRaw = Wilks, BwRRaw = BwRatio, DotsRaw = Dots) %>% 
@@ -363,9 +364,11 @@ attempts in competition. Below is the code outlining that:
 library(ggplot2)
 library(ggpubr)
 #find the success rate of each lift for each attempt
-lifts_SF <- as_tibble(as.data.frame(matrix(c(mean(pl_final$Squat1SF), mean(pl_final$Bench1SF), mean(pl_final$Deadlift1SF), 
-                               mean(pl_final$Squat2SF), mean(pl_final$Bench2SF), mean(pl_final$Deadlift2SF),
-                               mean(pl_final$Squat3SF), mean(pl_final$Bench3SF), mean(pl_final$Deadlift3SF)),
+lifts_SF <- as_tibble(as.data.frame(matrix(c(mean(pl_final$Squat1SF), mean(pl_final$Bench1SF), 
+                                             mean(pl_final$Deadlift1SF), mean(pl_final$Squat2SF), 
+                                             mean(pl_final$Bench2SF), mean(pl_final$Deadlift2SF), 
+                                             mean(pl_final$Squat3SF), mean(pl_final$Bench3SF), 
+                                             mean(pl_final$Deadlift3SF)),
                              byrow = T, nrow = 3)))
 lifts_SF <- lifts_SF %>% gather("Lift", "Ratio")
 lifts_SF$Lift <- c(rep("Squat", 3), rep("Bench", 3), rep("Deadlift", 3))
@@ -524,7 +527,8 @@ set.seed(4444)
 pl_cv_fold <- vfold_cv(pl_train, v = 10)
 
 #create a recipe
-S1Kg_rcp <- recipe(Squat1Kg ~ Squat3Kg + Age + Sex + BodyweightKg + Equipment, data = pl_train_small) %>%
+S1Kg_rcp <- recipe(Squat1Kg ~ Squat3Kg + Age + Sex + 
+                     BodyweightKg + Equipment, data = pl_train_small) %>%
   step_dummy(all_nominal(), -all_outcomes())
 
 #start with linear model
@@ -573,7 +577,7 @@ best_glm <- select_best(glm_tune, metric = "rmse")
 glm_wf %>% finalize_workflow(best_glm) %>% fit_resamples(pl_cv_fold) %>% collect_metrics()
 
 
-#random forest model, repeating the same steps as the LM, using extratrees to decrease training time
+#random forest model, using the same steps as the LM and extratrees to decrease training time
 ranger_model <- rand_forest(seed = 1, splitrule = "extratrees") %>%
   set_engine("ranger") %>%
   set_mode("regression")
@@ -616,27 +620,34 @@ the Shiny app.
 
 ``` r
 library(strip) #removes extra baggage from LM models, keeps only predictive information
-Squat1Kg_model <- lm(Squat1Kg ~ Squat3Kg + Age + Sex + BodyweightKg + Equipment, data = pl_model)
+Squat1Kg_model <- lm(Squat1Kg ~ Squat3Kg + Age + Sex + 
+                       BodyweightKg + Equipment, data = pl_model)
 Squat1Kg_model <- strip(Squat1Kg_model, keep = "predict")
 
-Squat2Kg_model <- lm(Squat2Kg ~ Squat3Kg + Age + Sex + BodyweightKg + Equipment, data = pl_model)
+Squat2Kg_model <- lm(Squat2Kg ~ Squat3Kg + Age + Sex + 
+                       BodyweightKg + Equipment, data = pl_model)
 Squat2Kg_model <- strip(Squat2Kg_model, keep = "predict")
 
-Bench1Kg_model <- lm(Bench1Kg ~ Bench3Kg + Age + Sex + BodyweightKg + Equipment, data = pl_model)
+Bench1Kg_model <- lm(Bench1Kg ~ Bench3Kg + Age + Sex + 
+                       BodyweightKg + Equipment, data = pl_model)
 Bench1Kg_model <- strip(Bench1Kg_model, keep = "predict")
 
-Bench2Kg_model <- lm(Bench2Kg ~ Bench3Kg + Age + Sex + BodyweightKg + Equipment, data = pl_model)
+Bench2Kg_model <- lm(Bench2Kg ~ Bench3Kg + Age + Sex + 
+                       BodyweightKg + Equipment, data = pl_model)
 Bench2Kg_model <- strip(Bench2Kg_model, keep = "predict")
 
-Deadlift1Kg_model <- lm(Deadlift1Kg ~ Deadlift3Kg + Age + Sex + BodyweightKg + Equipment, data = pl_model)
+Deadlift1Kg_model <- lm(Deadlift1Kg ~ Deadlift3Kg + Age + Sex + 
+                          BodyweightKg + Equipment, data = pl_model)
 Deadlift1Kg_model <- strip(Deadlift1Kg_model, keep = "predict")
 
-Deadlift2Kg_model <- lm(Deadlift2Kg ~ Deadlift3Kg + Age + Sex + BodyweightKg + Equipment, data = pl_model)
+Deadlift2Kg_model <- lm(Deadlift2Kg ~ Deadlift3Kg + Age + Sex + 
+                          BodyweightKg + Equipment, data = pl_model)
 Deadlift2Kg_model <- strip(Deadlift2Kg_model, keep = "predict")
 
 #create initial data.frame with random info
 user_info <- setNames(data.frame(20, factor("M"), 70, factor("Single-ply"), 140, 100, 185), 
-                      c("Age", "Sex", "BodyweightKg", "Equipment", "Squat3Kg", "Bench3Kg", "Deadlift3Kg"))
+                      c("Age", "Sex", "BodyweightKg", 
+                        "Equipment", "Squat3Kg", "Bench3Kg", "Deadlift3Kg"))
 
 #create full data.frame (includes 0 age group) with only relevant lift information
 pl_web_clean <- pl_filter4 %>% select(-Best3SquatKg, -Best3BenchKg, -Best3DeadliftKg, 
