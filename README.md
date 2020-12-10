@@ -120,7 +120,7 @@ data in other descriptors. Luckily, a large majority of these
 descriptors are not of interested, so I’ll drop the irrelevant ones:
 
 ``` r
-pl_filter <- powerlifting %>% select(-Country, -BirthYearClass, -Federation, -Date,
+pl_filter <- powerlifting %>% select(-Country, -BirthYearClass, -Federation, 
                                      -MeetCountry, -MeetState, -MeetName, -Goodlift, 
                                      -Glossbrenner, -Division, -ParentFederation, -MeetTown)
 
@@ -157,6 +157,7 @@ miss_var_summary(pl_filter) %>% as.data.frame()
     ## 26           Event       0  0.000000
     ## 27       Equipment       0  0.000000
     ## 28           Place       0  0.000000
+    ## 29            Date       0  0.000000
 
 ``` r
 gg_miss_var(pl_filter)
@@ -239,13 +240,13 @@ summary(pl_filter2)
     ##  3rd Qu.: 190.0   3rd Qu.:241.0   3rd Qu.: 610.0   3rd Qu.:414.45  
     ##  Max.   : 440.5   Max.   :433.5   Max.   :1275.5   Max.   :771.36  
     ##  NA's   :422603                                    NA's   :535     
-    ##      Wilks         Tested      
-    ##  Min.   : 28.23   Yes :330066  
-    ##  1st Qu.:306.61   NA's: 96810  
-    ##  Median :357.68                
-    ##  Mean   :361.76                
-    ##  3rd Qu.:412.57                
-    ##  Max.   :765.33                
+    ##      Wilks         Tested            Date           
+    ##  Min.   : 28.23   Yes :330066   Min.   :1967-09-02  
+    ##  1st Qu.:306.61   NA's: 96810   1st Qu.:2013-04-29  
+    ##  Median :357.68                 Median :2016-12-11  
+    ##  Mean   :361.76                 Mean   :2014-07-28  
+    ##  3rd Qu.:412.57                 3rd Qu.:2018-11-25  
+    ##  Max.   :765.33                 Max.   :2020-10-11  
     ##  NA's   :535
 
 ``` r
@@ -318,7 +319,7 @@ pl_filter4 <- pl_filter3 %>% select(-AgeClass, -WeightClassKg) %>%
 miss_var_summary(pl_filter4)
 ```
 
-    ## # A tibble: 45 x 3
+    ## # A tibble: 46 x 3
     ##    variable     n_miss pct_miss
     ##    <chr>         <int>    <dbl>
     ##  1 Bench4Kg     423332     99.4
@@ -331,7 +332,7 @@ miss_var_summary(pl_filter4)
     ##  8 BodyweightKg      0      0  
     ##  9 Squat1Kg          0      0  
     ## 10 Squat2Kg          0      0  
-    ## # ... with 35 more rows
+    ## # ... with 36 more rows
 
 ``` r
 #some minor feature engineering left

@@ -92,7 +92,7 @@ ui <- fluidPage(
                          h6(em(textOutput("example_lifter")))
                          ),
                 tabPanel("About",
-                         h3("About this calculator"),
+                         h3("About this calculator"), h5(tags$a(href="https://github.com/bdt833/powerlifting_calc", "(GitHub repo here)", target="_blank")),
                          br(),
                          br(),
                          h4("This calculator was originally made with the intent to create the most accurate lift attempt calculator for powerlifters who do not have experience with determining their openers or weight jumps. This calculator takes into account your age, body weight, sex, equipment, and expected max lift attempts. Statistically, all of these are important in determining your ideal attempted weight for each lift. Realistically, these data in general do not impact your overall lift attempts. The data was fit using a simple linear regression since powerlifting data is incredibly linear in nature."),

@@ -33,7 +33,7 @@ deadlift_sampsize <- pl_web_clean %>% group_by(Deadlift3Kg) %>% summarize(Sample
 pl_top01 <- pl_final %>% 
   group_by(Sex, Tested, Equipment) %>% 
   slice_max(order_by = CompDots, prop = 0.01) %>% 
-  ungroup %>% select(Name, Sex, Equipment, Age, BodyweightKg, Squat4Kg, 
+  ungroup %>% select(Name, Sex, Equipment, Age, Date, BodyweightKg, Squat4Kg, 
                      Best3SquatKg, Bench4Kg, Best3BenchKg, Deadlift4Kg, 
                      Best3DeadliftKg, TotalKg, DotsRaw, BwRRaw, CompDots, Tested) 
 

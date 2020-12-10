@@ -6,7 +6,7 @@ powerlifting <- read_csv("openpowerlifting-2020-10-16.csv",
 
 miss_var_summary(powerlifting) %>% as.data.frame() #convert to data.frame to view non-truncated results
 
-pl_filter <- powerlifting %>% select(-Country, -BirthYearClass, -Federation, -Date,
+pl_filter <- powerlifting %>% select(-Country, -BirthYearClass, -Federation, 
                                      -MeetCountry, -MeetState, -MeetName, -Goodlift, 
                                      -Glossbrenner, -Division, -ParentFederation, -MeetTown)
 
