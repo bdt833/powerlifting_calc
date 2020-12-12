@@ -1,33 +1,40 @@
 Powerlifting calculator
 ================
 For the past few years I have been doing a powerlifting style of
-strength training. I have created a calculator to help those competing
-in powerlifting meets in order to maximize their performance.
-Powerlifting meets/competitions have a simple structure: there are three
-lifts, squat/bench press/deadlift, and for each lift you get three
-attempts to lift the highest weight possible.
+strength training. One of the most important factors in powerlifting is
+determining how much weight you should lift during competition, which
+can be a daunting task for newcomers to the sport. In an effort to
+remedy this, I have created a calculator to help powerlifting
+competitors determine the weight they should lift in order to maximize
+their performance. Powerlifting meets/competitions have a simple
+structure: there are three lifts, squat/bench press/deadlift, and for
+each lift you have three attempts to lift the highest weight possible.
+
+## Table of contents
+
+1.  [Project Summary](#project-summary)
+2.  [Data Preparation](#data-preparation)
+3.  [Data Visualization](#data-visualization)
+4.  [Model Building](#model-building)
+5.  [Website Deployment](#website-deployment)
 
 ## Project Summary
-
-<details>
-
-<summary>TL;DR</summary>
 
 <ul>
 
 <li>
 
 Created a [website](https://bdt833.shinyapps.io/Powerlifting_Calc/)
-using Shiny to help powerlifters predict and visualize their competition
-lift attempts
+using Shiny to help powerlifters predict and visualize their lift
+attempts to maximize performance
 
 </li>
 
 <li>
 
-Discovered that bench press attempts are 10-15% more likely to fail as
-compared with squat or deadlift, suggesting bench press requires better
-training or better strategy in competition
+Discovered that bench press attempts are 10-15% more likely to fail on
+average as compared with squat or deadlift, suggesting bench press
+requires better training or better strategy in competition
 
 </li>
 
@@ -48,13 +55,7 @@ Tidymodels to choose the most accurate predictive model
 
 </ul>
 
-</details>
-
 ## Data Preparation
-
-<details>
-
-<summary>Open/close</summary>
 
 Open Powerlifting is a great platform that collects global data on
 powerlifting meets, hosted
@@ -116,8 +117,8 @@ miss_var_summary(powerlifting) %>% as.data.frame()
 
 This shows us that some identifier variables (Name, Sex, Event, Date,
 etc) have no missing data, but there is a substantial amount of missing
-data in other descriptors. Luckily, a large majority of these
-descriptors are not of interested, so I’ll drop the irrelevant ones:
+data in other descriptors. Luckily, a large majority of these features
+are not of interest, so I’ll drop the irrelevant ones:
 
 ``` r
 pl_filter <- powerlifting %>% select(-Country, -BirthYearClass, -Federation, 
@@ -165,12 +166,13 @@ gg_miss_var(pl_filter)
 
 ![](project_files/figure-gfm/unnamed-chunk-3-1.png)<!-- -->
 
-The variables corresponding to the individual lifts contain a vast
-majority of the missing data because many of the lifts only list the
-TotalKg lifted. I am interested in the weights of the individual lifts,
-and since there is no way to impute missing data, I will simply drop
-entries with missing values. Further, I am only interested in the “SBD”
-event, which has all three lifts.
+Of the remaining features, the individual lift attempts comprise a
+majority of the missing data. This is because much of the data only
+includes TotalKg lifted. Unfortunately, it is impossible to impute
+missing values for those individual lifts. Since I am only interested in
+the “SBD” event that includes data for all three squat, bench press, and
+deadlift attempts, I will simply drop the lift attempts with missing
+values.
 
 ``` r
 pl_filter2 <- pl_filter %>% filter(Event == "SBD") %>% 
@@ -186,7 +188,8 @@ nrow(pl_filter2)/nrow(pl_filter) #only 20% of the data remains
 
     ## [1] 0.2017352
 
-Let’s check the summary statistics and go from there:
+With the lift attempt data cleaned up, let’s check the summary
+statistics and go from there:
 
 ``` r
 summary(pl_filter2)
@@ -278,28 +281,38 @@ pl_filter3$Sex <- factor(pl_filter3$Sex)
 pl_filter3$Equipment <- factor(pl_filter3$Equipment)
 ```
 
-There is still a lot of work to do. There are some entries without an
-age, age class, bodyweight, or weight class; I could potentially impute
-the data from age class and weight class, or vice versa, but I will
-simply drop age/weight class and missing bodyweight values. There are a
-substantial amount of “ageless” competitors, so I will use an indicator
-number of age = 0 to signify that the value is missing. Further, there
-are some typos or data entry issues that I will filter out.
+There are some entries without an age, age class, bodyweight, or weight
+class. I could potentially impute the data from age class and weight
+class, or vice versa, but I will simply drop age/weight class and
+missing bodyweight values. There are a substantial number of “ageless”
+competitors, so I will use an indicator number of age = 0 for those with
+missing values. Further, there are some typos or data entry issues that
+I will need to filter out.
 
 ``` r
-pl_filter3 %>% filter(Age < 16) %>% ggplot(aes(TotalKg)) + geom_histogram(bins = 30) 
+pl_filter3 %>% filter(Age < 16) %>% ggplot(aes(Age, TotalKg)) + 
+  geom_point(alpha = 0.3) + 
+  ggtitle("Weight lifted by lifters under age 16")
 ```
 
 ![](project_files/figure-gfm/unnamed-chunk-6-1.png)<!-- -->
 
-It’s a bit unrealistic for lifters under 16 to have lifted over 500kg.
-I’ll change the age of anyone under 16 to have age = 0. In addition, I
-will create a bodyweight ratio variable and scale bodyweight ratio,
-Wilks score, and Dots score so as to be comparable to each other. Then,
-I create a compiled Dots and compiled Wilks score by averaging the
-scaled bodyweight ratio and respective score value. Dots and Wilks
-scores are absolute numbers that are used to compare your strength to
-other lifters; a higher number is better.
+It’s a bit unrealistic (but not impossible) for lifters under 16 to have
+lifted over 500kg. It’s also obvious that there are some data entry
+errors, with some strong 1 year-olds having lifted over 750kg. I’ll
+change the age of anyone under 16 to have age = 0 to prevent these data
+from impacting the model later on.
+
+In addition, I will create a bodyweight ratio variable and scale
+bodyweight ratio, Wilks score, and Dots score so as to be comparable to
+each other. Then, I create a compiled Dots and compiled Wilks score by
+averaging the scaled bodyweight ratio and respective score value. The
+Wilks and Dots scores are coefficients used to compare lifters among
+different weightclasses and genders, and a higher number is better.
+There has been [recent
+research](https://drive.google.com/drive/folders/1-0rE_GbYWVum7U1UfpR0XWiFR9ZNbXWJ)
+showing that Dots score is a fairer metric, but I have included both in
+order to compare them later.
 
 ``` r
 #change any NAs to 0 and change any lifter under age 16 to have age = 0 
@@ -341,22 +354,13 @@ pl_noage <- pl_filter4 %>% filter(Age == 0)
 pl_final <- pl_filter4 %>% filter(Age != 0)
 ```
 
-Finally\! Our data is looking nice and clean except for attempt 4. These
-are reserved for world-record breaking lift attempts, and these numbers
-will be left in for now. The Wilks and Dots scores are coefficients used
-to compare lifters among different weightclasses and genders, and a
-higher number is better. There has been [recent
-research](https://drive.google.com/drive/folders/1-0rE_GbYWVum7U1UfpR0XWiFR9ZNbXWJ)
-showing that Dots score is a fairer metric, but I have included both.
-Now, onto some visualizations/interesting statistics.
+Finally\! The data is looking nice and clean except for attempt 4.
+Typically there are only three attempts per lift, but lifters may be
+given a fourth attempt in order to break a world record. These numbers
+will be left in for now. Now, onto some visualizations about lift
+success and elite level powerlifters.
 
-</details>
-
-## Data Vis
-
-<details>
-
-<summary>Open/close</summary>
+## Data Visualization
 
 First, I want to see the overall success rate of each lift for the three
 attempts in competition. Below is the code outlining that:
@@ -383,17 +387,114 @@ lifts_SF %>% ggplot(aes(Attempt, Ratio, col = Lift)) +
 
 ![](project_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
 
-It looks like on attempts 1 and 2, the lifts are fairly well-balanced
-for success ratio. Bench press suffers from a much lower ratio of
-success on lift 3, though. This could mean either lifters already get a
-successful lift they are comfortable with on lift 2 and overreach on
-lift 3, or that lifters should in general aim for a safer lift attempt
-on lift 3.
+It looks like on attempts 1 and 2, the lifts’ success ratios are fairly
+balanced. Bench press suffers from a much lower success ratio on lift 3,
+though. Bench press is the most technical lift among the three in my
+opinion, and is most likely to fail at maximal weights. This could
+explain the discrepancy in success on lift 3, but to me it indicates
+that lifters should aim for a more conservative final attempt and tailor
+their strategy accordingly.
 
-Next, I will look at the top 0.1% of powerlifters for each Equipment
-category and get some idea of their strength metrics (Dots score,
-bodyweight ratio). The top powerlifters were those with the highest
-compiled Dots score.
+Next, I will look at the top 0.1% of powerlifters, sorted by either the
+scaled Dots coefficient, scaled bodyweight ratio, or the compiled Dots
+score. I will create scatterplots of bodyweight ratio vs Dots score in
+order to compare how well these metrics generalize across the population
+of lifters. I will check if these metrics include from all ranges of
+weight classes as a measure to see how fair they are.
+
+``` r
+#find the top 1% of powerlifters ordered  by Dots, BwRatio, and CompDots
+pl_top01_Dots <- pl_final %>% 
+  group_by(Sex, Tested, Equipment) %>% 
+  slice_max(order_by = Dots, prop = 0.01) %>% 
+  ungroup 
+
+pl_top01_BwRatio <- pl_final %>% 
+  group_by(Sex, Tested, Equipment) %>% 
+  slice_max(order_by = BwRatio, prop = 0.01) %>% 
+  ungroup 
+
+pl_top01_CompDots <- pl_final %>% 
+  group_by(Sex, Tested, Equipment) %>% 
+  slice_max(order_by = CompDots, prop = 0.01) %>% 
+  ungroup 
+
+#create scatterplots of BwRatio vs Dots raw scores
+top01_Dots_plot <- pl_top01_Dots %>% 
+  ggplot(aes(BwRRaw, DotsRaw, col = cut(BodyweightKg, c(0, 50, 60, 70, 80, 90, 100, 150, 200)))) + 
+  geom_point(alpha = 0.7) + 
+  scale_color_brewer(palette = "Dark2", name = "BodyweightKg") + 
+  xlim(3,15) + ylim(400, 800) + theme_pubr(legend = "right") + ggtitle("Top 1% (Dots)")
+
+top01_BwRatio_plot <- pl_top01_BwRatio %>% 
+  ggplot(aes(BwRRaw, DotsRaw, col = cut(BodyweightKg, c(0, 50, 60, 70, 80, 90, 100, 150, 200)))) + 
+  geom_point(alpha = 0.7) + 
+  scale_color_brewer(palette = "Dark2", name = "BodyweightKg") +  
+  xlim(3,15) + ylim(400, 800) + theme_pubr(legend = "right") +ggtitle("Top 1% (BwRatio)")
+
+top01_CompDots_plot <- pl_top01_CompDots %>% 
+  ggplot(aes(BwRRaw, DotsRaw, col = cut(BodyweightKg, c(0, 50, 60, 70, 80, 90, 100, 150, 200)))) + 
+  geom_point(alpha = 0.7) + 
+  scale_color_brewer(palette = "Dark2", name = "BodyweightKg") +  
+  xlim(3,15) + ylim(400, 800) + theme_pubr(legend = "right") + ggtitle("Top 1% (CompDots)")
+
+#combine all plots together
+ggarrange(top01_Dots_plot, top01_BwRatio_plot, top01_CompDots_plot)
+```
+
+![](project_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->
+
+I created bins for bodyweight and fixed the x- and y- axes in order to
+ensure that the scales and legend would be the same between plots. The
+top 1% Dots category is populated by more heavyweight competitors
+(100kg+), while the BwRatio category has almost none. The CompDots plot
+shows a mix between the Dots and BwRatio categories, with there being
+more heavyweight lifters included. The CompDots category is more
+balanced, showing that it is a good compromise between using either the
+Dots score or bodyweight ratio metric. One obvious insight from these
+plots is that lifters who have a higher bodyweight ratio metric will
+tend to be rated as better powerlifters overall.
+
+I mentioned earlier that Wilks and Dots coefficients are used in the
+same manner to compare the strength of lifters. One of the arguments for
+usage of the Dots score instead of the Wilks score is the Wilks score’s
+tendency to favor [heavier males and lighter
+females](http://ubercruzer.com/2019/02/25/is-the-ipf-points-formula-better-than-the-wilks-coefficient/).
+I want to see if this is observed from the data:
+
+``` r
+#create a Wilks-based top 1% list, similar to Dots
+pl_top01_Wilks <- pl_final %>% 
+  group_by(Sex, Tested, Equipment) %>% 
+  slice_max(order_by = Wilks, prop = 0.01) %>% 
+  ungroup 
+
+#create simple histograms and boxplots of BodyweightKg
+Wilks_hist <- pl_top01_Wilks %>% ggplot(aes(BodyweightKg)) + 
+  geom_histogram(bins = 20) + facet_wrap(~ Sex) + ylim(0, 400) +
+  theme_pubclean() + ggtitle("Wilks-based histogram of bodyweight in males and females")
+
+Dots_hist <- pl_top01_Dots %>% ggplot(aes(BodyweightKg)) + 
+  geom_histogram(bins = 20) + facet_wrap(~ Sex) + ylim(0, 400) +
+  theme_pubclean() + ggtitle("Dots-based histogram of bodyweight in males and females")
+
+ggarrange(Dots_hist, Wilks_hist, nrow = 2)
+```
+
+![](project_files/figure-gfm/unnamed-chunk-11-1.png)<!-- -->
+
+There is obviously a shift in distributions of bodyweight in Dots
+compared to Wilks. We can see that the Dots metric has its median
+shifted to the left, with a thinner right tail encompassing fewer heavy
+males. The Dots-based score shifts the median to the right in females,
+away from the Wilks bias towards lighter females. This helps to
+reinforce the notion that Dots is a fairer metric than Wilks across
+weight classes and genders.
+
+Next, I will look at the top 0.1% of powerlifters separated by the
+Equipment category and look at their strength metrics. As found above,
+CompDots seems to be the fairest metric for comparing powerlifters, so I
+will be using it to highlight the top 0.1% of lifters.
 
 ``` r
 #find the top 0.1% of powerlifters for each of the categories below, measured by compiled Dots score 
@@ -403,90 +504,83 @@ pl_top001 <- pl_final %>%
   ungroup 
 
 #list of top lifters in raw category
-pl_top001 %>% select(Name, CompDots, Dots, BwRatio, Equipment, BodyweightKg) %>% 
-  filter(Equipment == "Raw") %>% 
-  select(-Equipment) %>% 
+pl_top001 %>% filter(Equipment == "Raw") %>%
+  select(Name, CompDots, Dots, BwRatio, BodyweightKg, DotsRaw, BwRRaw) %>% 
   arrange(desc(CompDots)) %>% 
   print(n=30)
 ```
 
-    ## # A tibble: 194 x 5
-    ##    Name               CompDots  Dots BwRatio BodyweightKg
-    ##    <chr>                 <dbl> <dbl>   <dbl>        <dbl>
-    ##  1 Andrzej Stanaszek      3.18  2.69    3.67         51.3
-    ##  2 Sergey Fedosienko      3.07  2.63    3.51         58.5
-    ##  3 Andrzej Stanaszek      3.04  2.55    3.53         51.4
-    ##  4 Andrzej Stanaszek      3.04  2.55    3.52         51.2
-    ##  5 Sergey Fedosienko      3.01  2.56    3.45         58.2
-    ##  6 Andrzej Stanaszek      3.00  2.51    3.49         50.6
-    ##  7 Sergey Fedosienko      2.99  2.55    3.43         58.6
-    ##  8 Andrzej Stanaszek      2.97  2.48    3.46         49.9
-    ##  9 Sergey Fedosienko      2.97  2.53    3.41         58.4
-    ## 10 Sergey Fedosienko      2.97  2.52    3.41         57.6
-    ## 11 Sergey Fedosienko      2.96  2.52    3.40         58.2
-    ## 12 Marianna Gasparyan     2.95  3.40    2.50         56  
-    ## 13 John Haack             2.94  3.00    2.88         89.6
-    ## 14 John Haack             2.89  2.95    2.84         89.7
-    ## 15 Michael Estrella       2.87  2.54    3.20         67.3
-    ## 16 Andrzej Stanaszek      2.87  2.38    3.35         50.2
-    ## 17 Andrzej Stanaszek      2.85  2.38    3.33         52.8
-    ## 18 Jesse Norris           2.82  2.87    2.76         89.7
-    ## 19 Taylor Atwood          2.81  2.58    3.04         73.8
-    ## 20 Taylor Atwood          2.80  2.57    3.04         73.5
-    ## 21 Andrzej Stanaszek      2.78  2.30    3.26         51.3
-    ## 22 Andrzej Stanaszek      2.77  2.29    3.25         51.6
-    ## 23 Andrzej Stanaszek      2.76  2.28    3.24         51.4
-    ## 24 Michael Estrella       2.74  2.40    3.07         67.1
-    ## 25 Keith McHoney          2.73  2.41    3.05         68.3
-    ## 26 Stefanie Cohen         2.72  3.12    2.31         54.8
-    ## 27 Jawon Garrison         2.71  2.62    2.80         82.2
-    ## 28 Charles Okpoko         2.70  2.34    3.05         65.8
-    ## 29 Sergey Fedosienko      2.69  2.25    3.12         58.6
-    ## 30 Taylor Atwood          2.67  2.44    2.91         73.8
+    ## # A tibble: 194 x 7
+    ##    Name               CompDots  Dots BwRatio BodyweightKg DotsRaw BwRRaw
+    ##    <chr>                 <dbl> <dbl>   <dbl>        <dbl>   <dbl>  <dbl>
+    ##  1 Andrzej Stanaszek      3.18  2.69    3.67         51.3    582.  11.7 
+    ##  2 Sergey Fedosienko      3.07  2.63    3.51         58.5    577.  11.4 
+    ##  3 Andrzej Stanaszek      3.04  2.55    3.53         51.4    571.  11.5 
+    ##  4 Andrzej Stanaszek      3.04  2.55    3.52         51.2    571.  11.5 
+    ##  5 Sergey Fedosienko      3.01  2.56    3.45         58.2    572.  11.4 
+    ##  6 Andrzej Stanaszek      3.00  2.51    3.49         50.6    568.  11.4 
+    ##  7 Sergey Fedosienko      2.99  2.55    3.43         58.6    571.  11.3 
+    ##  8 Andrzej Stanaszek      2.97  2.48    3.46         49.9    566.  11.4 
+    ##  9 Sergey Fedosienko      2.97  2.53    3.41         58.4    570.  11.3 
+    ## 10 Sergey Fedosienko      2.97  2.52    3.41         57.6    569.  11.3 
+    ## 11 Sergey Fedosienko      2.96  2.52    3.40         58.2    568.  11.3 
+    ## 12 Marianna Gasparyan     2.95  3.40    2.50         56      640.   9.87
+    ## 13 John Haack             2.94  3.00    2.88         89.6    608.  10.5 
+    ## 14 John Haack             2.89  2.95    2.84         89.7    604.  10.4 
+    ## 15 Michael Estrella       2.87  2.54    3.20         67.3    570.  11.0 
+    ## 16 Andrzej Stanaszek      2.87  2.38    3.35         50.2    557.  11.2 
+    ## 17 Andrzej Stanaszek      2.85  2.38    3.33         52.8    557.  11.2 
+    ## 18 Jesse Norris           2.82  2.87    2.76         89.7    597.  10.3 
+    ## 19 Taylor Atwood          2.81  2.58    3.04         73.8    573.  10.7 
+    ## 20 Taylor Atwood          2.80  2.57    3.04         73.5    573.  10.7 
+    ## 21 Andrzej Stanaszek      2.78  2.30    3.26         51.3    551.  11.1 
+    ## 22 Andrzej Stanaszek      2.77  2.29    3.25         51.6    550.  11.0 
+    ## 23 Andrzej Stanaszek      2.76  2.28    3.24         51.4    549.  11.0 
+    ## 24 Michael Estrella       2.74  2.40    3.07         67.1    559.  10.8 
+    ## 25 Keith McHoney          2.73  2.41    3.05         68.3    560.  10.7 
+    ## 26 Stefanie Cohen         2.72  3.12    2.31         54.8    617.   9.58
+    ## 27 Jawon Garrison         2.71  2.62    2.80         82.2    577.  10.3 
+    ## 28 Charles Okpoko         2.70  2.34    3.05         65.8    554.  10.7 
+    ## 29 Sergey Fedosienko      2.69  2.25    3.12         58.6    547.  10.8 
+    ## 30 Taylor Atwood          2.67  2.44    2.91         73.8    562.  10.5 
     ## # ... with 164 more rows
 
-A couple of interesting things here. The top two athletes in the Raw
-equipment class are both dwarfs. Their lower body weight, range of
-motion, and better leverage allow for some incredibly impressive lifts.
-Lower weight athletes dominate by having a higher bodyweight ratio, but
-there are some impressive competitors like John Haack and Marianna
-Gasparyan that have stellar Dots scores.
-
-Below are two plots examining the raw Dots score and raw bodyweight
-ratio of the top 0.1% of lifters. The first plot shows that a majority
-of the elite powerlifters weigh around 70kg or less. You can see in the
-second plot that the single-/multi-ply group have a much larger raw Dots
-score *and* bodyweight ratio compared to all other equipment categories,
-making them unique in the powerlifting world.
+I am focusing on the raw category, and there are a few interesting
+things to note. The top two athletes in this class are both dwarfs.
+Their lower body weight, range of motion, and better leverage allow for
+some incredibly impressive lifts. We also know from above that lifters
+with a higher bodyweight ratio tend to dominate the upper echelons of
+powerlifting. The top 30 powerlifters all have a bodyweight ratio \>= 10
+except for two people, Marianna Gasparyan and Stefanie Cohen. Gasparyan
+and Cohen are notably world record-holding female powerlifters with the
+two highest Dots scores in the top 30. In fact, if we look at the top 5
+Dots scores overall, both of these lifters are included.
 
 ``` r
-#plots
-pl_top001 %>% ggplot(aes(BwRRaw, DotsRaw, col = BodyweightKg)) + 
-  geom_point() + 
-  scale_color_gradient(low = "blue", high = "red") + 
-  facet_wrap(~ Equipment)
+pl_top001 %>% filter(Equipment == "Raw") %>% 
+  arrange(desc(DotsRaw)) %>% 
+  select(Name, DotsRaw, BwRRaw) %>% 
+  print(n = 5)
 ```
 
-![](project_files/figure-gfm/unnamed-chunk-11-1.png)<!-- -->
+    ## # A tibble: 194 x 3
+    ##   Name                DotsRaw BwRRaw
+    ##   <chr>                 <dbl>  <dbl>
+    ## 1 Marianna Gasparyan     640.   9.87
+    ## 2 Kristy Hawkins         632.   8.70
+    ## 3 Kristy Hawkins         631.   8.69
+    ## 4 Hunter Henderson #1    625.   8.57
+    ## 5 Stefanie Cohen         617.   9.58
+    ## # ... with 189 more rows
 
-``` r
-pl_top001 %>% ggplot(aes(BwRRaw, DotsRaw, col = Equipment)) +
-    geom_point() +
-    scale_color_viridis_d(option = "plasma")
-```
+This goes to show that a metric for comparing bodyweight ratio and Dots
+coefficient, such as the CompDots score, is necessary to get a clear
+picture of powerlifters’ relative strengths.
 
-![](project_files/figure-gfm/unnamed-chunk-11-2.png)<!-- -->
+## Model Building
 
-</details>
-
-## Model building
-
-<details>
-
-<summary>Open/close</summary>
-
-Before modeling, I want to take a look at the data’s correlation matrix,
-as shown below.
+Before doing any modeling, I want to take a look at the data’s
+correlation matrix, as shown below.
 
 ``` r
 library(corrplot)
@@ -499,9 +593,9 @@ pl_cor_matrix <- cor(pl_corr)
 corrplot(pl_cor_matrix, type = "lower", tl.col = "black", tl.srt = 45)
 ```
 
-![](project_files/figure-gfm/unnamed-chunk-13-1.png)<!-- -->
+![](project_files/figure-gfm/unnamed-chunk-15-1.png)<!-- -->
 
-Except age, this data is all correlated and the variables in each lift
+Except age, this data is all correlated and the data in each lift
 category are highly linear. Simple linear regression, elastic net
 regression, and random forest regression are three common algorithms
 employed in predictive modeling. I will use the squat data to evaluate
@@ -602,19 +696,16 @@ same results, but linear regression was the model I used because it is
 the fastest and simplest to fit and train. These models were only
 evaluated for predicting Squat1Kg, but due to the highly correlated
 nature of the data, it is safe to employ the same model framework for
-predicting the others lifts.
+predicting the others lift attempts.
 
 Having said all of this, the linear model is almost superfluous; the
 lifts can generally (and more simply) be calculated by taking 90% and
-95% of attempt 3 to calculate attempt 1 and 2, respectively.
+95% of attempt 3 to calculate attempt 1 and 2, respectively. The reason
+why I say *almost* superfluous is because the model captures an
+interesting point in that, controlled for attempt 3, female lifters
+generally tend to lift heavier weights for attempts 1 and 2.
 
-</details>
-
-## Website deployment
-
-<details>
-
-<summary>Open/close</summary>
+## Website Deployment
 
 Before deploying the website, models for each attempt need to be fit and
 stripped down to reduce disk size. The dataset also needs to be stripped
@@ -693,5 +784,3 @@ save(Squat1Kg_model, Squat2Kg_model, Bench1Kg_model, Bench2Kg_model, Deadlift1Kg
 The dataset pl\_web\_clean has data from the age = 0 group of lifters,
 but this information is used only for plotting lift information and
 calculating success rate of certain lifts.
-
-</details>
